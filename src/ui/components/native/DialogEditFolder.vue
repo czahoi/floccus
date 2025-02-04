@@ -11,6 +11,21 @@
           v-model="temporaryTitle"
           label="Title"
           hide-details />
+        <v-text-field
+          v-model="parentTitle"
+          readonly
+          :error="Boolean(parentError)"
+          :error-messages="parentError"
+          label="Parent folder"
+          @click="onTriggerFolderChooser">
+          <template #append>
+            <v-icon
+              color="blue darken-1"
+              @click="onTriggerFolderChooser">
+              mdi-folder
+            </v-icon>
+          </template>
+        </v-text-field>
       </v-card-text>
       <v-card-actions>
         <v-spacer />
@@ -23,18 +38,24 @@
         <v-btn
           color="blue darken-1"
           text
-          @click="$emit('save', {title: temporaryTitle}); $emit('update:display', false)">
+          @click="onSave">
           {{ t('LabelSave') }}
         </v-btn>
         <v-spacer />
       </v-card-actions>
     </v-card>
+    <DialogChooseFolder
+      v-model="temporaryParent"
+      :display.sync="displayFolderChooser"
+      :tree="tree" />
   </v-dialog>
 </template>
 
 <script>
+import DialogChooseFolder from './DialogChooseFolder'
 export default {
   name: 'DialogEditFolder',
+  components: { DialogChooseFolder },
   props: {
     folder: {
       type: Object,
@@ -45,16 +66,62 @@ export default {
     },
     isNew: {
       type: Boolean,
+    },
+    tree: {
+      type: Object,
+      required: true,
+    },
+    parentFolder: {
+      type: Number,
+      default: -1
     }
   },
   data() {
     return {
-      temporaryTitle: this.folder.title || '',
+      temporaryTitle: '',
+      temporaryParent: null,
+      displayFolderChooser: false,
+      parentError: null,
+    }
+  },
+  computed: {
+    parentTitle() {
+      if (this.temporaryParent === null) {
+        return ''
+      }
+      const folder = this.tree.findFolder(this.temporaryParent)
+      return folder ? folder.title || this.t('LabelUntitledfolder') : ''
     }
   },
   watch: {
-    title() {
-      this.temporaryTitle = this.folder.title
+    temporaryParent() {
+      if (!this.tree.findFolder(this.temporaryParent)) {
+        this.parentError = this.t('ErrorNofolderselected')
+      } else if (this.folder && this.tree.findFolder(this.folder.id).findFolder(this.temporaryParent)) {
+        this.parentError = this.t('ErrorFolderloopselected')
+      } else {
+        this.parentError = null
+      }
+    }
+  },
+  mounted() {
+    this.temporaryTitle = this.folder.title || ''
+    const parentFolder = this.tree.findFolder(this.folder.parentId) ||
+        this.tree.findFolder(this.parentFolder) ||
+        this.tree.findFolder(this.$store.state.lastFolders[this.$route.params.accountId]) ||
+        this.tree.findFolder(this.tree.id)
+    this.temporaryParent = parentFolder.id
+  },
+  methods: {
+    onTriggerFolderChooser() {
+      this.displayFolderChooser = true
+    },
+    onSave() {
+      if (this.parentError) {
+        return
+      }
+      this.$emit('save', {title: this.temporaryTitle, parentId: this.temporaryParent})
+      this.$emit('update:display', false)
     }
   }
 }

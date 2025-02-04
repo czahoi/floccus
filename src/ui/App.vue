@@ -2,6 +2,21 @@
   <v-app
     id="app"
     :style="appStyle">
+    <v-banner
+      v-if="isBrowser"
+      color="primary"
+      class="mb-1 mt-3 white--text"
+      single-line>
+      {{ t('DescriptionDonateintervention') }}
+      <template #actions>
+        <v-btn
+          small
+          target="_blank"
+          href="https://floccus.org/donate/">
+          {{ t('LabelDonate') }}
+        </v-btn>
+      </template>
+    </v-banner>
     <v-content>
       <router-view />
     </v-content>
@@ -33,28 +48,21 @@
             </template>
             <span>{{ t('LabelFunddevelopment') }}</span>
           </v-tooltip>
-        </v-col>
-        <v-col class="d-flex flex-row-reverse">
-          <v-btn
-            v-if="secured"
-            text
-            x-small
-            :to="{name: routes.SET_KEY}"
-            target="_blank"
-            class="white--text">
-            <v-icon>mdi-lock-outline</v-icon>
-            {{ t('LabelSecuredcredentials') }}
-          </v-btn>
-          <v-btn
-            v-else
-            text
-            x-small
-            :to="{name: routes.SET_KEY}"
-            target="_blank"
-            class="white--text">
-            <v-icon>mdi-lock-open-outline</v-icon>
-            {{ t('LabelSecurecredentials') }}
-          </v-btn>
+          <v-tooltip top>
+            <template #activator="{ on, attrs }">
+              <v-btn
+                x-small
+                text
+                class="white--text"
+                v-bind="attrs"
+                :to="{name: routes.TELEMETRY}"
+                target="_blank"
+                v-on="on">
+                <v-icon>{{ telemetryEnabled ? 'mdi-bug-play-outline' : 'mdi-bug-pause-outline' }}</v-icon>
+              </v-btn>
+            </template>
+            <span>{{ t('LabelTelemetry') }}</span>
+          </v-tooltip>
         </v-col>
       </v-row>
     </v-footer>
@@ -93,9 +101,10 @@
 
 <script>
 import { version as VERSION } from '../../package.json'
-import { actions } from './store'
+import { actions } from './store/definitions'
 import { routes } from './router'
 import Controller from '../lib/Controller'
+import browser from '../lib/browser-api'
 export default {
   name: 'App',
   data() {
@@ -103,14 +112,12 @@ export default {
       VERSION,
       key: '',
       unlockError: null,
+      telemetryEnabled: false,
     }
   },
   computed: {
     locked() {
       return this.$store.state.locked
-    },
-    secured() {
-      return this.$store.state.secured
     },
     routes() {
       return routes
@@ -134,6 +141,8 @@ export default {
     window.addEventListener('beforeunload', unregister)
     window.addEventListener('unload', unregister)
     window.addEventListener('close', unregister)
+    const {telemetryEnabled} = await browser.storage.local.get({'telemetryEnabled': false})
+    this.telemetryEnabled = telemetryEnabled
   },
   methods: {
     async onUnlock() {
@@ -148,8 +157,8 @@ export default {
 }
 </script>
 
-<style scoped>
-#app {
-  min-width: 460px;
+<style>
+body {
+  min-width: 420px;
 }
 </style>

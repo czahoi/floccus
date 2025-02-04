@@ -1,7 +1,8 @@
 <template>
   <div>
     <v-app-bar
-      app>
+      app
+      absolute>
       <v-btn
         icon
         :to="{name: routes.TREE, params: {accountId: id}}">
@@ -26,6 +27,11 @@
           v-bind.sync="data"
           @reset="onReset"
           @delete="onDelete" />
+        <OptionsLinkwarden
+          v-if="data.type === 'linkwarden'"
+          v-bind.sync="data"
+          @reset="onReset"
+          @delete="onDelete" />
         <OptionsWebdav
           v-if="data.type === 'webdav'"
           v-bind.sync="data"
@@ -33,6 +39,16 @@
           @delete="onDelete" />
         <OptionsFake
           v-if="data.type === 'fake'"
+          v-bind.sync="data"
+          @reset="onReset"
+          @delete="onDelete" />
+        <OptionsGoogleDrive
+          v-if="data.type === 'google-drive'"
+          v-bind.sync="data"
+          @reset="onReset"
+          @delete="onDelete" />
+        <OptionsGit
+          v-if="data.type === 'git'"
           v-bind.sync="data"
           @reset="onReset"
           @delete="onDelete" />
@@ -45,13 +61,15 @@
 import OptionsFake from '../../components/OptionsFake'
 import OptionsWebdav from '../../components/OptionsWebdav'
 import OptionsNextcloudBookmarks from '../../components/OptionsNextcloudBookmarks'
-import { actions } from '../../store/native'
+import { actions } from '../../store/definitions'
 import { routes } from '../../NativeRouter'
-// iport PathHelper from '../../../lib/PathHelper'
+import OptionsGoogleDrive from '../../components/OptionsGoogleDrive'
+import OptionsGit from '../../components/OptionsGit.vue'
+import OptionsLinkwarden from '../../components/OptionsLinkwarden.vue'
 
 export default {
   name: 'Options',
-  components: { OptionsNextcloudBookmarks, OptionsWebdav, OptionsFake },
+  components: { OptionsLinkwarden, OptionsGit, OptionsGoogleDrive, OptionsNextcloudBookmarks, OptionsWebdav, OptionsFake },
   data() {
     return {
       drawer: false,
@@ -110,6 +128,8 @@ export default {
 }
 </script>
 
-<style scoped>
-
+<style>
+.text-h6 {
+  margin-top: 20px;
+}
 </style>

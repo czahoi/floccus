@@ -1,10 +1,10 @@
 <template>
   <div>
     <div class="text-h6">
-      {{ t('LabelResetCache') }}
+      {{ t('LabelSyncfromscratch') }}
     </div>
     <div class="caption">
-      {{ t('DescriptionResetCache') }}
+      {{ t('DescriptionResetcache') }}
     </div>
     <v-btn
       small

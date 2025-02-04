@@ -1,14 +1,16 @@
 export default interface IController {
-  key: string;
-  setEnabled(): void;
-  setKey(key):Promise<void>;
+  setEnabled(enabled:boolean): void;
   unlock(key):Promise<void>;
-  unsetKey():Promise<void>;
-  onchange(localId, details):Promise<void>;
   scheduleSync(accountId, wait):Promise<void>;
+  scheduleAll():Promise<void>;
   cancelSync(accountId, keepEnabled):Promise<void>;
-  syncAccount(accountId, strategy):Promise<void>;
-  updateStatus():Promise<void>;
+  syncAccount(accountId, strategy, forceSync):Promise<void>;
   onStatusChange(listener):()=>void;
+  getUnlocked():Promise<boolean>;
   onLoad():Promise<void>;
 }
+
+export const STATUS_ERROR = Symbol('error')
+export const STATUS_SYNCING = Symbol('syncing')
+export const STATUS_ALLGOOD = Symbol('allgood')
+export const STATUS_DISABLED = Symbol('disabled')

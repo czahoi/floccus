@@ -1,5 +1,15 @@
 <template>
   <v-container>
+    <div>
+      <v-text-field
+        append-icon="mdi-label"
+        class="mt-2 mb-4"
+        :value="label"
+        :label="t('LabelAccountlabel')"
+        :hint="t('DescriptionAccountlabel')"
+        :persistent-hint="true"
+        @input="$emit('update:label', $event)" />
+    </div>
     <v-card class="mb-4">
       <v-card-text
         id="server"
@@ -18,7 +28,6 @@
           :label="t('LabelUsername')"
           @input="$emit('update:username', $event)" />
         <v-text-field
-          :value="password"
           :label="t('LabelPassword')"
           :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
           :type="showPassword ? 'text' : 'password'"
@@ -32,16 +41,12 @@
           :hint="t('DescriptionBookmarksfile')"
           :persistent-hint="true"
           @input="$emit('update:bookmark_file', $event)" />
-        <v-text-field
-          class="mt-2"
+        <OptionPassphrase
           :value="passphrase"
-          :label="t('LabelPassphrase')"
-          :hint="t('DescriptionPassphrase')"
-          :persistent-hint="true"
-          :append-icon="showPassphrase ? 'mdi-eye' : 'mdi-eye-off'"
-          :type="showPassphrase ? 'text' : 'password'"
-          @click:append="showPassphrase = !showPassphrase"
           @input="$emit('update:passphrase', $event)" />
+        <OptionFileType
+          :value="bookmark_file_type"
+          @input="$emit('update:bookmark_file_type', $event)" />
       </v-card-text>
     </v-card>
 
@@ -61,6 +66,23 @@
       </v-card-text>
     </v-card>
 
+    <v-card
+      v-if="!isBrowser"
+      class="mb-4">
+      <v-card-title
+        id="mobile"
+        class="text-h5">
+        <v-icon>mdi-cellphone-settings</v-icon>
+        {{ t('LabelMobilesettings') }}
+      </v-card-title>
+      <v-card-text>
+        <OptionAllowNetwork
+          :value="allowNetwork"
+          @input="$emit('update:allowNetwork', $event)" />
+        <OptionExportBookmarks />
+      </v-card-text>
+    </v-card>
+
     <v-card class="mb-4">
       <v-card-title
         id="sync"
@@ -69,8 +91,10 @@
         {{ t('LabelOptionsSyncBehavior') }}
       </v-card-title>
       <v-card-text>
+        <OptionAutoSync
+          :value="enabled"
+          @input="$emit('update:enabled', $event)" />
         <OptionSyncInterval
-          v-if="isBrowser"
           :value="syncInterval"
           @input="$emit('update:syncInterval', $event)" />
         <OptionSyncStrategy
@@ -91,6 +115,7 @@
         {{ t('LabelOptionsDangerous') }}
       </v-card-title>
       <v-card-text>
+        <OptionDownloadLogs />
         <OptionClientCert
           v-if="isBrowser"
           :value="includeCredentials"
@@ -119,11 +144,17 @@ import OptionNestedSync from './OptionNestedSync'
 import OptionFailsafe from './OptionFailsafe'
 import OptionClientCert from './OptionClientCert'
 import OptionAllowRedirects from './OptionAllowRedirects'
+import OptionDownloadLogs from './OptionDownloadLogs'
+import OptionAllowNetwork from './native/OptionAllowNetwork'
+import OptionFileType from './OptionFileType'
+import OptionExportBookmarks from './OptionExportBookmarks.vue'
+import OptionPassphrase from './OptionPassphrase.vue'
+import OptionAutoSync from './OptionAutoSync.vue'
 
 export default {
   name: 'OptionsWebdav',
-  components: { OptionAllowRedirects, OptionClientCert, OptionFailsafe, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval, OptionNestedSync },
-  props: ['url', 'username', 'password','passphrase', 'includeCredentials', 'serverRoot', 'localRoot', 'syncInterval', 'strategy', 'bookmark_file', 'nestedSync', 'failsafe', 'allowRedirects'],
+  components: { OptionAutoSync, OptionExportBookmarks, OptionAllowNetwork, OptionDownloadLogs, OptionAllowRedirects, OptionClientCert, OptionFailsafe, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval, OptionNestedSync, OptionFileType, OptionPassphrase },
+  props: ['url', 'username', 'password','passphrase', 'includeCredentials', 'serverRoot', 'localRoot', 'allowNetwork', 'syncInterval', 'strategy', 'bookmark_file', 'nestedSync', 'failsafe', 'allowRedirects', 'bookmark_file_type', 'enabled', 'label'],
   data() {
     return {
       panels: [0, 1],

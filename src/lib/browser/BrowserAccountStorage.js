@@ -2,8 +2,9 @@ import browser from '../browser-api'
 import Cryptography from '../Crypto'
 import DefunctCryptography from '../DefunctCrypto'
 import Mappings from '../Mappings'
-import { Folder } from '../Tree'
+import { Folder, ItemLocation } from '../Tree'
 import AsyncLock from 'async-lock'
+import Logger from '../Logger'
 
 const storageLock = new AsyncLock()
 
@@ -23,12 +24,18 @@ export default class BrowserAccountStorage {
 
   static async getEntry(entryName, defaultVal) {
     let entry = await browser.storage.local.get(entryName)
-    if (entry[entryName]) {
-      while (typeof entry[entryName] === 'string') {
-        entry[entryName] = JSON.parse(entry[entryName])
+    try {
+      if (entry[entryName]) {
+        while (typeof entry[entryName] === 'string') {
+          entry[entryName] = JSON.parse(entry[entryName])
+        }
+        return entry[entryName]
+      } else {
+        return defaultVal
       }
-      return entry[entryName]
-    } else {
+    } catch (e) {
+      Logger.log('Error while parsing BrowserAccountStorage entry value ' + e.message)
+      console.error(e)
       return defaultVal
     }
   }
@@ -101,7 +108,7 @@ export default class BrowserAccountStorage {
     const data = await BrowserAccountStorage.getEntry(
       `bookmarks[${this.accountId}].cache`
     )
-    return Folder.hydrate(data && Object.keys(data).length ? data : {})
+    return Folder.hydrate(data && Object.keys(data).length ? data : {location: ItemLocation.LOCAL})
   }
 
   async setCache(data) {
@@ -152,5 +159,13 @@ export default class BrowserAccountStorage {
 
   async deleteMappings() {
     await BrowserAccountStorage.deleteEntry(`bookmarks[${this.accountId}].mappings`)
+  }
+
+  async getCurrentContinuation() {
+    return BrowserAccountStorage.getEntry(`bookmarks[${this.accountId}].continuation`)
+  }
+
+  async setCurrentContinuation(continuation) {
+    await BrowserAccountStorage.changeEntry(`bookmarks[${this.accountId}].continuation`, (_) => ({...continuation, createdAt: Date.now()}), null)
   }
 }

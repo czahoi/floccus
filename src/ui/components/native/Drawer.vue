@@ -3,7 +3,7 @@
     :value="visible"
     app
     temporary
-    absolute
+    :width="320"
     @input="$emit('update:visible')">
     <v-list-item two-line>
       <v-list-item-avatar>
@@ -32,10 +32,7 @@
           <v-list-item-icon>
             <v-icon>{{ account.data.type | accountIcon }}</v-icon>
           </v-list-item-icon>
-
-          <v-list-item-content>
-            <v-list-item-title>{{ account.label }}</v-list-item-title>
-          </v-list-item-content>
+          <v-list-item-title>{{ account.label }}</v-list-item-title>
         </v-list-item>
       </template>
       <v-list-item
@@ -52,15 +49,36 @@
       </v-list-item>
       <v-divider />
       <v-list-item
-        key="donate"
+        key="export"
         link
-        href="https://floccus.org/download#support">
+        :to="{name: routes.IMPORTEXPORT}">
         <v-list-item-icon>
-          <v-icon>mdi-heart-outline</v-icon>
+          <v-icon>mdi-export</v-icon>
         </v-list-item-icon>
-
         <v-list-item-content>
-          <v-list-item-title>{{ t('LabelFunddevelopment') }}</v-list-item-title>
+          <v-list-item-title>{{ t('LabelImportExport') }}</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+      <v-list-item
+        key="bugs"
+        link
+        href="https://github.com/floccusaddon/floccus/issues">
+        <v-list-item-icon>
+          <v-icon>mdi-bug-outline</v-icon>
+        </v-list-item-icon>
+        <v-list-item-content>
+          <v-list-item-title>{{ t('LabelReportproblem') }}</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+      <v-list-item
+        key="about"
+        link
+        :to="{name: routes.ABOUT}">
+        <v-list-item-icon>
+          <v-icon>mdi-information-outline</v-icon>
+        </v-list-item-icon>
+        <v-list-item-content>
+          <v-list-item-title>{{ t('LabelAbout') }}</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
     </v-list>
@@ -74,9 +92,11 @@ export default {
   filters: {
     accountIcon(type) {
       const icons = {
-        'googledrive': 'mdi-google-drive',
         'nextcloud-bookmarks': 'mdi-cloud',
-        'webdav': 'mdi-folder-network'
+        'linkwarden': 'mdi-link-box-variant-outline',
+        'webdav': 'mdi-folder-network',
+        'git': 'mdi-source-repository',
+        'google-drive': 'mdi-google-drive'
       }
       return icons[type]
     },
