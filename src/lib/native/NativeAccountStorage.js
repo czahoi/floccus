@@ -1,9 +1,10 @@
-import { Storage } from '@capacitor/storage'
+import { Preferences as Storage } from '@capacitor/preferences'
 import Cryptography from '../Crypto'
 import DefunctCryptography from '../DefunctCrypto'
 import Mappings from '../Mappings'
-import { Folder } from '../Tree'
+import { Folder, ItemLocation } from '../Tree'
 import AsyncLock from 'async-lock'
+import Logger from '../Logger'
 
 const storageLock = new AsyncLock()
 
@@ -23,12 +24,18 @@ export default class NativeAccountStorage {
 
   static async getEntry(entryName, defaultVal) {
     let entry = await Storage.get({key: entryName })
-    if (entry.value) {
-      while (typeof entry.value === 'string') {
-        entry.value = JSON.parse(entry.value)
+    try {
+      if (entry.value) {
+        while (typeof entry.value === 'string') {
+          entry.value = JSON.parse(entry.value)
+        }
+        return entry.value
+      } else {
+        return defaultVal
       }
-      return entry.value
-    } else {
+    } catch (e) {
+      Logger.log('Error while parsing NativeAccountStorage entry value ' + e.message)
+      console.error(e)
       return defaultVal
     }
   }
@@ -101,7 +108,7 @@ export default class NativeAccountStorage {
     const data = await NativeAccountStorage.getEntry(
       `bookmarks[${this.accountId}].cache`
     )
-    return Folder.hydrate(data && Object.keys(data).length ? data : {})
+    return Folder.hydrate(data && Object.keys(data).length ? data : {location: ItemLocation.LOCAL})
   }
 
   async setCache(data) {
@@ -152,5 +159,13 @@ export default class NativeAccountStorage {
 
   async deleteMappings() {
     await NativeAccountStorage.deleteEntry(`bookmarks[${this.accountId}].mappings`)
+  }
+
+  async getCurrentContinuation() {
+    return NativeAccountStorage.getEntry(`bookmarks[${this.accountId}].continuation`)
+  }
+
+  async setCurrentContinuation(continuation) {
+    await NativeAccountStorage.changeEntry(`bookmarks[${this.accountId}].continuation`, (_) => continuation, null)
   }
 }

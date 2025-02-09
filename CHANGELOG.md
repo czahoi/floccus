@@ -1,5 +1,715 @@
 # Changelog
 
+## [5.4.4]
+
+### Fixed
+* fix(SyncProcess): When creating dummy bookmarks representing separators, make sure to use vertical lines on the Toolbar, and horizontal lines otherwise. (thanks to @macrogreg)
+* fix(Xbel): Don't parse tag values
+* fix: Throw nice error for when gdrive search fails
+* fix: Clean up dependencies (#1851)
+* fix(messages): Specify that the file path doesn't matter for Google Drive
+
+## [5.4.3]
+
+### Fixed
+
+* fix(OptionsLinkwarden): Allow changing server folder
+* fix(Storage): Don't give up when storage entry can not be parsed
+* refactor(Account#setData): Accept partial data and use lock to set data (fixes hanging sync on iOS)
+* fix(README): Add APK cert fingerprint
+* fix(GoogleDrive|WebDAV): Try to catch more errors when file is encrypted
+* enh(AutoSync): Add an explantion in settings
+* [native] Try to find a valid URL when an app shares title+URL stuffed together (thanks to Andy Balaam)
+* [native] Check that a URL is valid as soon as we load the Add Bookmark dialog (thanks to Andy Balaam)
+* [native] Prevent saving a newly-added bookmark if the URL is bad (thanks to Andy Balaam)
+* [native] Catch and log any errors we encounter when parsing a URL to display its hostname (thanks to Andy Balaam)
+
+## [5.4.2]
+
+(aka 5.4.2.1)
+
+### New
+
+* [native] enh(Search): Match partial words
+* enh(Caching): Add edge:// to supported schemes
+* enh: Don't produce UPDATE actions when URLs change
+
+### Fixed
+
+* fix(SyncProcess): Refactor mergeable functions
+* fix(SyncProcess): Fix URL collisions on NC Bookmarks
+* fix(SyncProcess): Shorten excessive logging of REORDER actions
+* fix(Logger): Improve log redaction
+* fix(NextcloudBookmarks): More info in log when requests fail
+* fix(NextcloudBookmarks): Better error message when UPDATE fails
+* fix(OptionsWebDAV): re-init file when bookmark_file option is changed
+* fix(WebDAV): Fail when trying to sync to XBEL file with html setting and vice versa
+* fix(stringifyError): inspect bookmark to avoid [object Object]
+* Fix copy/paste typos for E037 & E038 error messages. (Thanks to John Hein)
+* fix(WebDAV): Fix "includes is not a function" error
+* fix(GoogleDrive): Log response on auth failure
+
+
+## [5.4.2-alpha.1]
+
+### New
+
+* [native] enh(Search): Match partial words
+* enh(Caching): Add edge:// to supported schemes
+* enh: Don't produce UPDATE actions when URLs change
+
+### Fixed
+
+* fix(SyncProcess): Refactor mergeable functions
+* fix(SyncProcess): Fix URL collisions on NC Bookmarks
+* fix(SyncProcess): Shorten excessive logging of REORDER actions
+* fix(Logger): Improve log redaction
+* fix(NextcloudBookmarks): More info in log when requests fail
+* fix(NextcloudBookmarks): Better error message when UPDATE fails
+* fix(OptionsWebDAV): re-init file when bookmark_file option is changed
+* fix(WebDAV): Fail when trying to sync to XBEL file with html setting and vice versa
+* fix(stringifyError): inspect bookmark to avoid [object Object]
+* Fix copy/paste typos for E037 & E038 error messages. (Thanks to John Hein)
+
+## [5.4.1]
+
+### Fixed
+
+* [native] fix(AddBookmarkIntent): Folder selector was broken
+* [ios] fix(design): Make top bar dark when in dark mode
+* fix(NewAccount): Don't refresh page on enter in accountlable field
+* fix(Bookmark): Accept url = null
+* fix(NextcloudBookmarks): Remove unnecessary code
+* fix(Linkwarden): Ignore bookmarks with url = null
+
+## [5.4.0] - 2024-11-30
+
+### New
+* enh(Tree): Add confirmation before deleting items
+* enh(tabs): Make merge strategy work with tabs
+* [native] enh(DialogChooseFolder): Allow creating folders
+* [native] enh(Drawer): Add github issues link
+* [native] enh(search): Show search results from other folders
+* [native] enh: Allow selecting up down sync by long press on sync button
+* [native] enh: Remember sort option & sort folders first
+* [native] enh: Improve search by ranking better matches higher
+* enh(Account#sync): Allow forcing sync when profile is scheduled
+
+### Fixed
+* [native] fix(DialogChooseFolder): Sort folders according to sort order setting
+* [native] fix(newbookmark): Use neutral user agent to get correct title
+* [native] fix(Tree): Sorting by link
+* [native] fix: Properly reset accounts on load
+* fix(Scanner): Improve move stability with same-titled folders
+* fix(GoogleDrive|WebDAV): fix _.includes is not a function error
+* fix(Account#sync): Do not break lock automatically
+
+## [5.3.4] - 2024-11-17
+
+### Fixed
+
+* fix(NativeTree): Set location to Local (fixes "Failed to map parentId: 0" error)
+* fix(Linkwarden): Set Folder#isRoot
+* fix(Linkwarden): Correctly update bookmarks on the server
+
+## [5.3.3] - 2024-11-09
+
+### New
+
+* enh(Git): Mention profile label in commit message
+ 
+### Fixed
+* fix(ios/sharing-extension): Add compat for newer ios versions
+* fix(GoogleDrive): includes is not a function
+* fix(Update): Fix visual glitch
+
+## [5.3.2] - 2024-11-01
+
+### Fixed
+
+* [iOS] Attempt to fix inbound sharing 
+
+
+## [5.3.1] - 2024-10-09
+
+### Fixed
+
+* [native] fix(Linkwarden): Remove dispatch of REQUEST_NETWORK_PERMISSIONS
+* [native] fix(Linkwarden): Options were not showing
+* fix: Don't break if browser doesn't implement permissions API
+* fix(GoogleDrive): Try to delete superfluous files
+* fix(NextcloudBookmarks): Run javascript feature detection earlier to avoid losing javascript bookmarks upon browser start
+* fix(Html): Only escape unsafe characters in HTML
+
+## [5.3.0] - 2024-09-28
+
+(aka v5.3.0.2)
+
+### New
+
+* Add support for Linkwarden
+
+### Fixed
+
+* fix(GoogleDrive): Sort files by modified date
+
+## [5.3.0-beta.1] - 2024-09-12
+
+(aka v5.3.0.1)
+
+### New
+
+* Add support for Linkwarden
+
+## [5.2.7] - 2024-09-03
+
+### Fixed
+
+* fix: Filter out "file:" URLs when syncing tabs on firefox
+* fix: Log error from google API when retrieving access token
+* [native] fix: Tree comparison on RELOAD_TREE_FROM_DISK was broken
+* [native] fix: make builds reproducible again
+* fix(Html): Encode unsafe characters as HTML entities
+
+## [5.2.6] - 2024-08-11
+
+### Fixed
+
+* chore: update capacitor/core
+* fix(Update): Show floccus logo on update page
+* fix: Refactor sync algorithm introducing location types (fixed 6 correctness bugs along the way)
+
+## [5.2.5] - 2024-07-25
+
+### Fixed
+* [native] feat: warn user if URL is already bookmarked
+* [native] fix: small visual fixes
+* [native] fix: Automatically reload from disk when resuming app
+* [native] fix: replace cordova-inappbrowser with capacitor/browser
+* [native] chore: Upgrade capacitor to v6
+* feat(AccountCard): Link to github issues on error
+* perf(GoogleDrive, WebDav): Don't loop through all lines when finding highest ID
+* feat(Telemetry): Add report problem button to Telemetry page
+* feat(AccountCard): Link to github issues on error
+* fix(Cancel): Improve cancel UX
+* fix(NextcloudBookmarks): Increase timeout
+* fix(Git): Clean up used indexedDB instances
+* fix(Controller logic): Catch all 'Receiving end does not exist' errors
+* fix(Account): Don't compile logs for each error
+* fix(Xbel): Don't attempt to parse numbers
+* fix(GoogleDrive,WebDAV): Allow passing salt in file contents
+* fix(GoogleDrive): Don't free lock if it wasn't locked
+* fix(Cancel): Improve cancel UX
+* fix(NextcloudBookmarks): Increase timeout
+* chore(package.json): Add necessary NODE_OPTIONS to scripts
+* chore(ios): Update ios assets
+
+## [5.2.4] - 2024-07-02
+
+### Fixed
+
+* fix(Account): Use exponential backoff instead of disabling profile after 10 errors
+* [native] fix(font-size): set default font-size using cm
+* fix(imports): Don't allow importing actions definitions from store/index
+* [native] fix(Options): Avoid importing browser-only module
+* fix(Folder#traverse)
+* fix typo in README.md in git repos
+* fix(Default#executeAction): fix ordering when doing bulkImport in Unidirectional strategy
+* fix(NextcloudBookmarks): Make sure folder exists before appending children
+
+
+## [5.2.3] - 2024-06-21
+
+### Fixed
+
+* fix(AccountCard): mention if profile was disabled after error
+* fix(OptionsGit): Branch option didn't propagate new value
+
+## [5.2.2] - 2024-06-16
+
+### Fixed
+
+* iOS: Fix sharing from apps other than Safari
+
+## [5.2.1] - 2024-06-15
+
+### Fixed
+
+* fix: make history permission optional and request on demand only
+
+## [5.2.0] - 2024-06-11
+
+### New
+
+* feat: Allow custom labels for profiles
+* feat: Allow counting clicks with Nextcloud Bookmarks
+* feat: Add some UI interventions asking for donations
+* feat: Opt-in automated error reporting using Sentry
+
+### Fixed
+
+* fix: Don't sync scheduled profiles if they're disabled
+* fix: Don't show update notification if the user doesn't use floccus
+* fix: Do not run two scanners at the same time
+* fix: Improve build script to avoid faulty builds
+* fix: Give browser more time to breathe to avoid freezing browser
+* fix: Disable profile after 10 errors in a row
+
+## [5.1.7] - 2024-05-28
+
+### Fixed
+
+* [native] Don't reload tree in TREE_LOAD
+
+## [5.1.5] - 2024-05-28
+
+### Fixed
+
+* [native] fix tree loading mechanism that would cause issues with syncing
+
+## [5.1.4] - 2024-05-21
+
+### Fixed
+
+* [native] fix(Drawer): Add icon for git profiles
+* fix: Improve locking logic
+* fix(BrowserController): Don't spam setIcon warnings
+* fix(Account): call onSyncFail if onSyncStart fails
+
+## [5.1.3] - 2024-05-18
+
+### Fixed
+
+* [native] fix: set largeHeap to true on android + fix git settings
+* fix: Improve locking logic
+* fix(NextcloudBookmarks#getExistingBookmarks): Don't use search-by-url for javascript links
+* fix: Make Diff#inspect() output more readable
+* fix: Limit concurrency for reorderings
+* fix: Improve bulkImport performance by chunking
+* fix: Unhandled error "Receiving end does not exist"
+
+## [5.1.2] - 2024-05-14
+
+### Fixed
+* fix(GoogleDrive): Catch 500 errors
+* [native] fix: Reload tree on app resume
+* fix(NextcloudBookmarks): Remove feature detection of 5yo features
+* [native] fix(intent): Register intent activity properly
+* feat(NextcloudBookmarks): Accept javascript: links
+* fix(webpack): Don't set DEBUG to true in production
+* fix(BrowserController#setStatusBadge): Don't throw when setting icon
+* fix(Account#progressCallback): Don't error if syncProcess is not defined yet
+* fix: Don't error in old Chrome versions if browser.permissions.contains fails
+* fix: Wrap local tree fetch error
+* fix(webpack): Split initial chunks to avoid AMO review complaining
+
+## [5.1.1] - 2024-05-10
+
+### Fixed
+
+* fix(SyncProcess): Do not serialize all trees each progress tick
+* fix(SyncProcess): Call progressCb 2x less
+* fix(Account): Extract and unify progressCallback
+* fix(SyncProcess): Limit action execution concurrency to 12
+* fix(Account): Properly declare DEBUG the typescript way
+* fix(syncProcess): Properly count planned actions
+* fix(Git): On init don't use force push
+* fix(Git): Only bulldoze the repository if HEAD or branch cannot be found
+* Add optional automatic error reporting to discover dormant bugs
+* fix(Unidirectional): Scanner should use mappings if possible
+* fix({html,xbel} parsers): Don't replace '0' by ''
+* fix: Don't set lock after freeing it
+* Fix(BrowserTree): Don't load full Tree on startup
+
+## [5.1.0] - 2024-05-05
+
+### New
+ - enh(ui): Add git adapter: You can now sync via git
+
+### Fixed
+* fix(GoogleDrive): Don't pollute console
+* fix(BrowserController#getStatus): Show error icon if an account hasn't been synced in two days
+* fix: Ignore errors from browser.permissions.contains
+* fix: Ignore errors in REQUEST_NET_PERMS
+* fix: Replace node.js' url with whatwg URL
+* fix(browserslist): support and_chr >=60
+* fix: Don't sync tabs if floccus' browser profile is not active
+* fix(performance): Turn parallel processing back on Marcel Klehr 03.05.24, 19:30
+* fix(Account#sync): Don't store continuation if the adapter is caching changes internally
+
+## [5.0.12] - 2024-04-26
+
+### Fixed
+ - fix(tests/gdrive): Don't derive file name from seed
+ - chore: Allow fuzzed testing with interrupts on nextcloud-bookmarks
+ - enh(ci/tests); Use github sha as seed
+ - fix: Store continuation while sync is running to be able to resume after interrupts
+ - chore: Update donation methods Marcel Klehr 21.04.24, 20:57
+- fix: Distinguish between InterruptedSyncError and CancelledSyncError
+- [android] Include dependenciesInfo in gradle file
+- [native] fix(Account): Don't try to load LocalTabs resource
+
+## [5.0.11] - 2024-03-09
+
+### Fixed
+
+* fix: Android app stuck on splash screen
+
+## [5.0.10] - 2024-03-08
+
+### Fixed
+
+* fix(Account#sync): Break lock after 2h
+* bookmarks folder selection: Select sub folder in Vivaldi
+
+## [5.0.9] - 2024-01-08
+
+### Fixed
+
+* [chrome] fix(background sync): Apply hack to keep service worker alive
+
+## [5.0.8] - 2024-01-07
+
+### Fixed
+
+* fix(nextcloud login flow): Use standalone browser on iOS
+* fix(manifest.firefox.json): Make sure host permission matches the one in the code
+
+## [5.0.7] - 2024-01-04
+
+### Fixed
+
+* [native] Fix hanging splash screen
+* fix(Controller): Remember strategy when scheduling sync after lock error
+* Complete translations for Japanese, Spanish and German
+
+## [5.0.6] - 2023-12-31
+
+### Fixed
+* fix(background sync): Move back to manifest v2 for firefox
+* fix(Account#setData): re-init if localRoot is changed
+* fix(Options): Fix v-switch input
+* fix(Controller#scheduleSync): Allow syncing if account is disabled and scheduled
+
+## [5.0.5] - 2023-12-20
+
+### Fixed
+
+* Fix: Move waiting for lock out of adapters into controller
+* fix(NextcloudBookmarks): Use CapacitorHttp to avoid cors errors in capacitor 5
+* fix(native/START_LOGIN_FLOW): migrate to new capacitor http API
+
+## [5.0.4] - 2023-12-15
+
+### Fixed
+
+* [native] upgrade capacitor-oauth2
+* [native] fix(GoogleDrive): CapacitorHttp no longer encodes x-form-urlencoded
+* fix(Import): Request network permissions before import
+* fix(GoogleDrive): Request network permissions before login
+
+## [5.0.3] - 2023-12-12
+
+### Fixed
+
+- [native] Remove capacitor community http Marcel Klehr 36 minutes ago
+- [native] fix(DialogImportBookmarks): accept="text/html"
+- [android] fix(webdav): Use new builtin CapacitorHttp
+- fix(Unlock with credentials): Missing await 🙈
+- fix(Profile import)
+- fix(options): Auto-sync option was not saved
+- fix(GoogleDrive): Fix permissions.contains syntax
+- fix: Always cast to string before comparing item ids
+- fix(HtmlSerializer): Try to fix ordering test
+- fix(HtmlSerializer): Use Cheerio.text() for getting title
+
+## [5.0.2] - 2023-12-09
+
+### Fixed
+
+- Fix another XBEL parser bug
+- Fix HTML parser
+
+## [5.0.1] - 2023-12-09
+
+### Fixed
+
+- Fixes XBEL parser
+
+## [5.0.0] - 2023-12-09
+
+## New
+
+ - Avoid syncing private tabs
+ - Add a 'Sync all' button
+ - Overhaul profile overview UI
+
+## Changed
+
+ - [browser] Migrate to Manifest v3
+ - [browser] remove unlock passphrase feature
+ - [native] Remove background mode because it was buggy
+ - Sync 3s after startup
+ - Upgrade to capacitor 5
+ - Upgrade to gradle 8
+ - "Accounts" are now called "Profiles"
+
+## Fixed
+
+ - [native] Reset profile syncing state on app start
+ - [native] Allow turning auto-sync back on
+ - [native] fix(AddBookmarkIntent): Close intent after saving bookmark
+ - [ios] fix(sharing) Fix share target
+ - Allow setting sync interval to 5min
+ - Local folder option: Make more clear what each option does and the implications of that
+ - Store passphrase for google-drive encryption correctly
+ - NextcloudBookmarks: Do not write lock after onSyncCompleted
+ - Fix bookmarks change detection
+ - Fix BrowserController#onchange: Don't error out on deleted items
+ - fix(FileUnreadableError): Make error message more clear
+ - fix(downloadLogs): Add redacted/full to file name
+ - fix(messages): Make it more clear that people need to install Nextcloud Bookmarks to use it
+ - fix(BrowserController): Set unlocked to true by default
+ - fix(LocalTabs): Don't activate all tabs upon creating them
+ - fix(ImportExport): Trigger alert when import is done
+ - fix(OptionsWebdav): properly import OptionsPassphrase component
+ - fix(OptionsSyncFolder): show spinner while running getTree
+ - fix(HtmlSerializer): Make html output compatible with common browsers while maintaining backward compatibility
+
+## v4.19.1
+
+### Fixed
+ - Fix Scanner ignore logic for root folders 
+
+## v4.19.0
+
+### New
+ - Implement share extension for iOS
+ - [native] Allow sharing bookmarks to other apps
+ - [native] Implement bookmarks export
+ - [native] Allow exporting accounts
+ - [native] Download logs like in browser instead of sharing them as text
+
+### Fixed
+ - OptionSyncInterval: Allow setting 5min
+ - Avoid generating diff for local absolute root folders
+ - fix(Default#executeAction): Prepapre subOrder Diff correctly
+ - Allow syncing bookmarks with file: protocol via WebDAV and GDrive
+ - Update dependencies
+
+## v4.18.1
+
+### Fixed
+ - Update cordova-plugin-background-mode to fix frequent crashes
+ - OptionSyncInterval: Allow setting 5minutes interval
+ - DialogEditBookmark: Don't allow submitting empty URL
+ - Unidirectional: ignore errors when mapping reorders
+
+## v4.18.0
+
+### New
+- [native] Display breadcrumbs when not in root folder
+- [native] Implement bookmarks import
+
+### Fixed
+ - NextcloudBookmarks: Improve error message when bookmark creation fails
+ - [native] Log in production
+ - [native] NewAccount: Show IMPORTEXPORT button
+ - [native] Remove pull-to-refresh for now as it's buggy
+ - [native] Home#checkForIntent: Fix share routine 
+ - Don't cast item IDs to boolean inside if statements 
+ - NextcloudBookmarks: Report all statuses > 400 as HttpError
+ - [native] Options & NewAccount: Allow setting sync interval on android 
+ - AccountCard: Display last sync time on error 
+ - TEST_WEBDAV_SERVER: Improve error message
+
+## v4.17.1
+
+### Fixed
+ - Fix selecting HTML at setup (#1247)
+ - Fix Google Drive on native (#1246)
+
+## v4.17.0
+
+
+### New
+- WebDav: Allow syncing via HTML file
+- Tab Sync: Name folders by window number
+- NewAccount: Add back buttons
+- Options{GoogleDrive, WebDAV}: Allow removing passphrase
+
+### Fixed
+ - Fixed Google Drive integration on iOS
+ - Fix Sync with caching-enabled WebDAV servers
+ - [native] Use themed background for body
+ - Fix Nextcloud login flow for 2FA
+ - [android] Fix share intent for unreachable URLs
+
+## v4.16.0
+
+### New
+ - Performance improvements
+ - Improve speed for Nextcloud Bookmarks
+
+### Fixed
+ - SyncProcesses: Remove superfluous awaits that would stall the whole app
+ - a11y: improve syncing icon in browser
+ - ios: Hide status bar
+ - Fix InAppBrowser usage to comply with Apple policies
+ - getFavicon: Load /favicon.ico as a fallback
+ - UX: Remove min-width on #app
+ - Replace merge icon to avoid confusion with sync icon (#1198)
+ - OptionSyncStrategy: Improve wording
+ - Options: Do not show strategy if isBrowser
+ - [native] Fix Alphabetical sorting
+
+## v4.15.0
+
+### New
+- [Native] AddBookmarkIntent: Autodetect page title
+- NewAccount: Allow setting enabled account config
+- NewAccount: Allow setting XBEL passphrase for GoogleDrive and WebDAV
+- 
+### Fixed
+- Fix order corruption of localRoot folder
+- Tabs: Fix syncing multiple windows
+- NewAccount: Warn user when using server without https
+- Improve UI so there's space for translations
+- NewAccount: Remove stepper headings so the whole stepper fits
+- Failsafe: added Math.ceil to only allow integers
+- New translations for Polish, French and Chinese
+
+## v4.14.0
+
+### New
+- New stepwise account setup flow
+- NewAccount: Trigger sync after completion
+- Improve progress bar behavior
+- Allow more than one separator per Folder on Nc Bookmarks
+- [Native] Allow sorting bookmarks
+- [Native] Background sync while on wifi
+
+### Fixed
+- [Native] Fix splash screen aspect ratio
+- [Native] Make app-bar absolute instead of hide on scroll
+- Improve wording around sync strategies
+- BrowserController: Don't get stuck in sync loop
+- GoogleDrive: Add cancel method
+- Fix transifex integration
+- UI: Do not show passwords in new options session
+- Inactivity timeout := 7s
+- [Native] Add allowNetwork to default settings
+- Fix Tab sync order on firefox
+
+## v4.13.1
+
+### New
+
+- [Native] Implement about page
+
+### Fixed
+- UI: Re-add accidentally removed actions
+
+## v4.13.0
+
+### New
+- [native] Implement pull-to-refresh
+- [native] Implement ImportExport (without export for now)
+- Detect machine suspend during sync and cancel
+
+### Fixed
+ - Performance: Do not query root bookmarks folder excessively
+ - [Android] Fix app label
+ - [Android] Fix Nextcloud Login flow
+ - Locking: Adjust LOCK_INTERVAL
+ - Locking: Fix wrong usage of {set,clear}Timeout
+ - Fix lock-file being locked in GoogleDrive and WebDAV
+ - Fix "failed to map parentId" in Unidirectional strategy
+ - Unidirectional: Fix typo
+ - Unidirectional: Fix progress bar
+ - Adjust lock override strategy
+
+## v4.12.0
+
+### New
+- [Native] Schedule sync automatically after local edits
+- [native] Implement Update screen
+- Implement support for separators
+- More beautiful status indicators
+- Sync chrome:// URLs (but not on Firefox and not with Nextcloud bookmarks)
+- Implement timed locks for GoogleDrive and WebDAV to reduce waiting time
+- Reduce inactivity timeout to 20s
+
+### Fixed
+- [Native] Fix broken favicons
+- [Native] speed-up tree navigation
+- [native] Performance improvements
+- [native] UX: Allow pressing BACK when adding/editing items
+- UX: Improve progress bar feedback during syncing
+- UX: Improve wording around sync strategies
+- Performance: Avoid loading all of lodash
+- Google Drive: Force upload when new account or new encryption
+- Do not delete duplicate bookmarks anymore
+- Tab sync: Do not remove duplicated tabs on sync and sync tab order
+- Fix Unidirectional sync
+- Unidirectional: Fix ordering
+- LocalTabs: Implement set order
+- Improve order reconciliation
+- Keep local sort order of ignored items
+- GoogleDrive: Fix locking
+- WebDAV: Don't lock if using slave strategy
+
+
+## v4.11.0
+
+### New
+- [Android] Implement allowNetwork option
+- Tab sync: Sync tabs with names
+- Overview: Sort disabled accounts last
+- WebDAV: Reduce lock timeout to 15min
+- GoogleDrive: Reduce lock timeout to 15min
+
+### Fixes
+- Fix UX: Have two "download logs" buttons instead of "anonymous" checkbox
+- Fix tab sync
+- Logger: Fix log redaction
+- OptionsGoogleDrive: Don't show passphrase by default
+- Do not reset cache after interrupted sync
+- Do not reset cache after network error
+- Test and fix complex move-remove interactions
+- Update deps and install dark mode fix for android
+- [Native] DialogEdit{Folder,Bookmark}: Use current folder
+
+## v4.10.1
+
+### Fixes
+- [Android] Fix WebDAV and FaviconImage
+
+## v4.10.0
+
+### New
+- Allow producing anonymized logs
+- [Android] Allow moving items and choosing parent upon creation
+- [Android] Allow Logs download
+- [Android] SendIntent: Allow receiving title + fix cold start intent
+
+### Fixes
+- Get rid of capacitor-community/http (Fixes many unforeseen sync problems both on Android and Desktop)
+- [Android] Clean up boilerplate clutter and update deps
+- Styles: Add more spacing between option entries
+- Fix load languages with hyphens (Thanks to @binsee)
+
+## v4.9.0
+
+### New
+- [Android] Implement Google Auth
+
+### Fixes
+ - [Browser] Fix i18n for displaying error messages
+ - OptionResetCache: Fix description l10n id
+ - NextcloudBookmarks: Fix getLabel to avoid 'n@d@d' labels
+ - UI: Validate URLs to be http(s)
+
 ## v4.8.7
 
 ### Fixes

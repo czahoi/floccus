@@ -11,11 +11,21 @@
       </div>
     </template>
     <template v-else>
-      <AccountCard
-        v-for="account in accountData"
-        :key="account.id"
-        :account="account"
-        class="mb-3" />
+      <template v-for="account in accountData">
+        <AccountCard
+          v-if="account.data.enabled"
+          :key="account.id"
+          :account="account"
+          class="mb-3" />
+      </template>
+      <template v-for="account in accountData">
+        <!-- Sort disabled accounts last -->
+        <AccountCard
+          v-if="!account.data.enabled"
+          :key="account.id"
+          :account="account"
+          class="mb-3" />
+      </template>
       <v-container
         v-if="!Object.keys(accountData).length"
         class="mt-12 pt-12"
@@ -30,6 +40,7 @@
       <v-container class="d-flex flex-row pa-0">
         <v-btn
           class="flex-grow-1 me-1"
+          color="primary"
           :to="{ name: routes.NEW_ACCOUNT }"
           target="_blank">
           <v-icon>
@@ -38,10 +49,16 @@
           {{ t('LabelNewAccount') }}
         </v-btn>
         <v-btn
+          class="me-1"
           :title="t('LabelImportExport')"
           :to="{ name: routes.IMPORTEXPORT }"
           target="_blank">
           <v-icon>mdi-export</v-icon>
+        </v-btn>
+        <v-btn
+          :title="t('LabelSyncall')"
+          @click="clickSyncAll">
+          <v-icon>mdi-sync-circle</v-icon>
         </v-btn>
       </v-container>
     </template>
@@ -51,6 +68,7 @@
 <script>
 import AccountCard from '../components/AccountCard'
 import { routes } from '../router'
+import { actions } from '../store/definitions'
 
 export default {
   name: 'Overview',
@@ -64,6 +82,11 @@ export default {
     },
     loading() {
       return this.$store.state.loading.accounts
+    },
+  },
+  methods: {
+    clickSyncAll() {
+      this.$store.dispatch(actions.TRIGGER_SYNC_ALL)
     }
   }
 }

@@ -37,7 +37,6 @@
       </template>
     </v-text-field>
     <v-text-field
-      :value="password"
       :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
       :type="showPassword ? 'text' : 'password'"
       :label="t('LabelPassword')"
@@ -47,6 +46,7 @@
 </template>
 
 <script>
+import { actions } from '../store/definitions'
 
 export default {
   name: 'NextcloudLogin',
@@ -74,12 +74,6 @@ export default {
   },
   methods: {
     async onFlowStart() {
-      let actions
-      if (this.isBrowser) {
-        ({ actions } = await import('../store'))
-      } else {
-        ({ actions } = await import('../store/native/'))
-      }
       this.error = null
       try {
         const credentials = await this.$store.dispatch(actions.START_LOGIN_FLOW, this.server)
@@ -90,13 +84,7 @@ export default {
       }
     },
     async onFlowStop() {
-      let actions
-      if (this.isBrowser) {
-        ({ actions } = await import('../store'))
-      } else {
-        ({ actions } = await import('../store/native/'))
-      }
-      await this.$store.dispatch(actions.STOP_LOGIN_FLOW)
+      await this.$store.dispatch('STOP_LOGIN_FLOW')
     }
   }
 }

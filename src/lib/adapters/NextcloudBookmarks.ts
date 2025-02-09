@@ -1,5 +1,6 @@
 // Nextcloud ADAPTER
 // All owncloud specifc stuff goes in here
+import { Capacitor, CapacitorHttp as Http } from '@capacitor/core'
 import Adapter from '../interfaces/Adapter'
 import HtmlSerializer from '../serializers/Html'
 import Logger from '../Logger'
@@ -7,32 +8,32 @@ import { Bookmark, Folder, ItemLocation, TItem } from '../Tree'
 import { Base64 } from 'js-base64'
 import AsyncLock from 'async-lock'
 import * as Parallel from 'async-parallel'
-import url from 'url'
 import PQueue from 'p-queue'
 import flatten from 'lodash/flatten'
-import { BulkImportResource, LoadFolderChildrenResource, OrderFolderResource } from '../interfaces/Resource'
+import {
+  BulkImportResource,
+  ClickCountResource,
+  LoadFolderChildrenResource,
+  OrderFolderResource
+} from '../interfaces/Resource'
 import Ordering from '../interfaces/Ordering'
 import {
-  AuthenticationError,
-  HttpError,
-  InconsistentBookmarksExistenceError,
-  InconsistentServerStateError,
-  InterruptedSyncError,
+  AuthenticationError, CreateBookmarkError,
+  HttpError, CancelledSyncError,
+  MissingPermissionsError,
   NetworkError,
   ParseResponseError,
   RedirectError,
-  RequestTimeoutError,
+  RequestTimeoutError, ResourceLockedError,
   UnexpectedServerResponseError,
   UnknownCreateTargetError,
   UnknownFolderParentUpdateError,
   UnknownFolderUpdateError,
-  UnknownMoveTargetError
+  UnknownMoveTargetError, UpdateBookmarkError
 } from '../../errors/Error'
-import { Http } from '@capacitor-community/http'
-import { Device } from '@capacitor/device'
 
 const PAGE_SIZE = 300
-const TIMEOUT = 180000
+const TIMEOUT = 300000
 
 export interface NextcloudBookmarksConfig {
   type: 'nextcloud-folders'|'nextcloud-bookmarks'
@@ -42,6 +43,8 @@ export interface NextcloudBookmarksConfig {
   serverRoot?: string
   includeCredentials?: boolean
   allowRedirects?: boolean
+  allowNetwork?: boolean
+  label?: string
 }
 
 interface IChildFolder {
@@ -57,26 +60,31 @@ interface IChildOrderItem {
   children?: IChildOrderItem[]
 }
 
-export default class NextcloudBookmarksAdapter implements Adapter, BulkImportResource, LoadFolderChildrenResource, OrderFolderResource {
+const LOCK_INTERVAL = 2 * 60 * 1000 // Set lock every two minutes while syncing
+
+export default class NextcloudBookmarksAdapter implements Adapter, BulkImportResource<typeof ItemLocation.SERVER>, LoadFolderChildrenResource<typeof ItemLocation.SERVER>, OrderFolderResource<typeof ItemLocation.SERVER>, ClickCountResource<typeof ItemLocation.SERVER> {
   private server: NextcloudBookmarksConfig
   private fetchQueue: PQueue<{ concurrency: 12 }>
   private bookmarkLock: AsyncLock
-  public hasFeatureHashing:boolean = null
-  public hasFeatureExistenceCheck:boolean = null
-  public hasFeatureChildren:boolean = null
   public hasFeatureBulkImport:boolean = null
-  private list: Bookmark[]
-  private tree: Folder
-  private lockId: string | number
+  private list: Bookmark<typeof ItemLocation.SERVER>[]
+  private tree: Folder<typeof ItemLocation.SERVER>
+  private abortController: AbortController
+  private abortSignal: AbortSignal
   private canceled = false
   private cancelCallback: () => void = null
+  private lockingInterval: any
+  private lockingPromise: Promise<boolean>
+  private ended = false
+  private locked = false
+  private hasFeatureJavascriptLinks: boolean = null
 
   constructor(server: NextcloudBookmarksConfig) {
     this.server = server
     this.fetchQueue = new PQueue({ concurrency: 12 })
     this.bookmarkLock = new AsyncLock()
-    this.hasFeatureHashing = false
-    this.hasFeatureExistenceCheck = false
+    this.abortController = new AbortController()
+    this.abortSignal = this.abortController.signal
   }
 
   static getDefaultValues(): NextcloudBookmarksConfig {
@@ -87,7 +95,8 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
       password: 's3cret',
       serverRoot: '',
       includeCredentials: false,
-      allowRedirects: false
+      allowRedirects: false,
+      allowNetwork: false,
     }
   }
 
@@ -101,65 +110,85 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
 
   getLabel():string {
     const data = this.getData()
-    return data.username.includes('@') ? data.username + ' on ' + url.parse(data.url).hostname : data.username + '@' + url.parse(data.url).hostname
+    return data.label || (data.username.includes('@') ? data.username + ' on ' + new URL(data.url).hostname : data.username + '@' + new URL(data.url).hostname)
   }
 
-  acceptsBookmark(bm: Bookmark):boolean {
-    return Boolean(~['https:', 'http:', 'ftp:'].indexOf(url.parse(bm.url).protocol))
-  }
-
-  normalizeServerURL(input:string):string {
-    const serverURL = url.parse(input)
-    const indexLoc = serverURL.pathname.indexOf('index.php')
-    return url.format({
-      protocol: serverURL.protocol,
-      auth: serverURL.auth,
-      host: serverURL.host,
-      port: serverURL.port,
-      pathname:
-        serverURL.pathname.substr(0, ~indexLoc ? indexLoc : undefined) +
-        (!~indexLoc && serverURL.pathname[serverURL.pathname.length - 1] !== '/'
-          ? '/'
-          : ''),
-    })
-  }
-
-  timeout(ms) {
-    return new Promise((resolve, reject) => {
-      setTimeout(resolve, ms)
-      this.cancelCallback = () => reject(new InterruptedSyncError())
-    })
-  }
-
-  async onSyncStart(): Promise<void> {
-    this.canceled = false
-    const startDate = Date.now()
-    const maxTimeout = 30 * 60 * 1000 // Give up after 0.5h
-    const base = 1.25
-    for (let i = 0; Date.now() - startDate < maxTimeout; i++) {
-      if (await this.acquireLock()) {
-        break
-      } else {
-        await this.timeout(base ** i * 1000)
-      }
+  acceptsBookmark(bm: Bookmark<typeof ItemLocation.SERVER>):boolean {
+    try {
+      return Boolean(~['https:', 'http:', 'ftp:'].concat(this.hasFeatureJavascriptLinks ? ['javascript:'] : []).indexOf(new URL(bm.url).protocol))
+    } catch (e) {
+      return false
     }
   }
 
+  normalizeServerURL(input:string):string {
+    const serverURL = new URL(input)
+    const indexLoc = serverURL.pathname.indexOf('index.php')
+    if (!serverURL.pathname) serverURL.pathname = ''
+    serverURL.search = ''
+    serverURL.hash = ''
+    serverURL.pathname = serverURL.pathname.substring(0, ~indexLoc ? indexLoc : undefined)
+    const output = serverURL.toString()
+    return output + (output[output.length - 1] !== '/' ? '/' : '')
+  }
+
+  async onSyncStart(needLock = true, forceLock = false): Promise<void> {
+    if (Capacitor.getPlatform() === 'web') {
+      const browser = (await import('../browser-api')).default
+      let hasPermissions, error = false
+      try {
+        hasPermissions = await browser.permissions.contains({ origins: [this.server.url + '/'] })
+      } catch (e) {
+        error = true
+        console.warn(e)
+      }
+      if (!error && !hasPermissions) {
+        throw new MissingPermissionsError()
+      }
+    }
+
+    await this.checkFeatureJavascriptLinks()
+
+    this.abortController = new AbortController()
+    this.abortSignal = this.abortController.signal
+
+    if (this.lockingInterval) {
+      clearInterval(this.lockingInterval)
+    }
+
+    // if needLock -- we always need it
+    this.locked = await this.acquireLock()
+    if (forceLock) {
+      this.locked = true
+    } else if (!this.locked) {
+      throw new ResourceLockedError()
+    }
+    this.lockingInterval = setInterval(() => !this.ended && this.acquireLock(), LOCK_INTERVAL)
+
+    this.canceled = false
+    this.ended = false
+  }
+
   async onSyncComplete(): Promise<void> {
+    this.ended = true
+    clearInterval(this.lockingInterval)
     await this.releaseLock()
   }
 
   async onSyncFail(): Promise<void> {
+    this.ended = true
+    clearInterval(this.lockingInterval)
     await this.releaseLock()
   }
 
   cancel() {
     this.canceled = true
     this.fetchQueue.clear()
+    this.abortController.abort()
     this.cancelCallback && this.cancelCallback()
   }
 
-  async getBookmarksList():Promise<Bookmark[]> {
+  async getBookmarksList():Promise<Bookmark<typeof ItemLocation.SERVER>[]> {
     return this.bookmarkLock.acquire('list', async() => {
       if (this.list) {
         return this.list
@@ -185,7 +214,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
         data.map((bm) => {
           const bookmark = {
             id: bm.id as number | string,
-            url: bm.url as string,
+            url: (bm.target || bm.url) as string,
             title: bm.title as string,
             parentId: null,
             location: ItemLocation.SERVER,
@@ -205,47 +234,14 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     })
   }
 
-  async getBookmarksTree(loadAll = false):Promise<Folder> {
+  async getBookmarksTree(loadAll = false):Promise<Folder<typeof ItemLocation.SERVER>> {
     this.list = null // clear cache before starting a new sync
 
-    // feature detection: Check if the server offers hashes
-    const hashResponse = await this.sendRequest(
-      'GET',
-      'index.php/apps/bookmarks/public/rest/v2/folder/-1/hash',
-      null,
-      null,
-      true
-    )
-    let json
-    try {
-      json = await hashResponse.json()
-    } catch (e) {
-      json = hashResponse.data
-      // noop
-    }
-
-    if (
-      !loadAll &&
-      ((hashResponse.status === 200 && json && json.status === 'success') ||
-        hashResponse.status === 504)
-    ) {
+    if (!loadAll) {
       return this.getSparseBookmarksTree()
     } else {
-      this.hasFeatureHashing = false
       return this.getCompleteBookmarksTree()
     }
-  }
-
-  async _getChildOrder(folderId:string|number, layers:number):Promise<IChildOrderItem[]> {
-    const childrenOrderJson = await this.sendRequest(
-      'GET',
-      `index.php/apps/bookmarks/public/rest/v2/folder/${folderId}/childorder` +
-        (layers ? `?layers=${layers}` : '')
-    )
-    if (!Array.isArray(childrenOrderJson.data)) {
-      throw new UnexpectedServerResponseError()
-    }
-    return childrenOrderJson.data
   }
 
   async _getChildFolders(folderId:string|number, layers = 0):Promise<IChildFolder[]> {
@@ -259,7 +255,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return folderJson.data
   }
 
-  async _findServerRoot():Promise<Folder> {
+  async _findServerRoot():Promise<Folder<typeof ItemLocation.SERVER>> {
     let tree = new Folder({ id: -1, location: ItemLocation.SERVER })
     let childFolders
     await Parallel.each(
@@ -293,7 +289,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return tree
   }
 
-  async getCompleteBookmarksTree():Promise<Folder> {
+  async getCompleteBookmarksTree():Promise<Folder<typeof ItemLocation.SERVER>> {
     let tree = new Folder({ id: -1, location: ItemLocation.SERVER })
     if (this.server.serverRoot) {
       tree = await this._findServerRoot()
@@ -304,10 +300,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return tree.clone()
   }
 
-  async getSparseBookmarksTree() :Promise<Folder> {
-    this.hasFeatureHashing = true
-    this.hasFeatureExistenceCheck = true
-
+  async getSparseBookmarksTree() :Promise<Folder<typeof ItemLocation.SERVER>> {
     let tree = new Folder({ id: -1, location: ItemLocation.SERVER })
 
     if (this.server.serverRoot) {
@@ -334,143 +327,42 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
       })
   }
 
-  async _getChildren(folderId:string|number, layers:number):Promise<TItem[]> {
-    let childrenJson
-    if (
-      this.hasFeatureChildren === null ||
-      this.hasFeatureChildren
-    ) {
-      try {
-        childrenJson = await this.sendRequest(
-          'GET',
-          `index.php/apps/bookmarks/public/rest/v2/folder/${folderId}/children?layers=${layers}`
-        )
-        this.hasFeatureChildren = true
-      } catch (e) {
-        this.hasFeatureChildren = false
-      }
-    }
-    if (this.hasFeatureChildren) {
-      const children = childrenJson.data
-      const recurseChildren = (folderId, children) => {
-        return children.map((item) => {
-          if (item.type === 'bookmark') {
-            return new Bookmark({
-              id: item.id + ';' + folderId,
-              title: item.title,
-              parentId: folderId,
-              url: item.url,
-              location: ItemLocation.SERVER,
-            })
-          } else if (item.type === 'folder') {
-            const childFolder = new Folder({
-              id: item.id,
-              parentId: folderId,
-              title: item.title,
-              location: ItemLocation.SERVER,
-            })
-            childFolder.loaded = Boolean(item.children) // not children.length but whether the whole children field exists
-            childFolder.children = recurseChildren(item.id, item.children || [])
-            return childFolder
+  async _getChildren(folderId:string|number, layers:number):Promise<TItem<typeof ItemLocation.SERVER>[]> {
+    const childrenJson = await this.sendRequest(
+      'GET',
+      `index.php/apps/bookmarks/public/rest/v2/folder/${folderId}/children?layers=${layers}`
+    )
+    const children = childrenJson.data
+    const recurseChildren = (folderId, children) => {
+      return children.map((item) => {
+        if (item.type === 'bookmark') {
+          if ('target' in item && this.hasFeatureJavascriptLinks === null) {
+            this.hasFeatureJavascriptLinks = true
           }
-        })
-      }
-      return recurseChildren(folderId, children).filter(item => item.id !== this.lockId)
-    } else {
-      // We don't have the children endpoint available, so we have to query all bookmarks that exist :(
-      await this.getBookmarksList()
-
-      const tree = new Folder({id: folderId, location: ItemLocation.SERVER})
-      const [childrenOrder, childFolders, childBookmarks] = await Promise.all([
-        this._getChildOrder(folderId, layers),
-        this._getChildFolders(folderId, layers),
-        Promise.resolve().then(
-          () =>
-            this.list ||
-            this.sendRequest(
-              'GET',
-              `index.php/apps/bookmarks/public/rest/v2/bookmark?folder=${folderId}&page=-1`
-            ).then((json) => json.data)
-        ),
-      ])
-      const recurseChildFolders = async(tree:Folder, childFolders:IChildFolder[], childrenOrder:IChildOrderItem[], childBookmarks:any[], layers:number) => {
-        const folders = await Parallel.map(
-          childrenOrder,
-          async(child) => {
-            if (child.type === 'folder') {
-              // get the folder from the tree we've fetched above
-              const folder = childFolders.find((folder) => String(folder.id) === String(child.id))
-              if (!folder) throw new InconsistentServerStateError()
-              const newFolder = new Folder({
-                id: child.id,
-                title: folder.title,
-                parentId: tree.id,
-                loaded: false,
-                location: ItemLocation.SERVER,
-              })
-              tree.children.push(newFolder)
-              return { newFolder, child, folder}
-            } else {
-              // get the bookmark from the list we've fetched above
-              // which might either be Bookmark[] or a raw bookmark list response with no parentId but a folders array
-              let childBookmark = childBookmarks.find(
-                (bookmark) =>
-                  String(bookmark.id) === String(child.id) &&
-                  (!bookmark.parentId || String(bookmark.parentId) === String(tree.id))
-              )
-              if (!childBookmark) {
-                throw new InconsistentBookmarksExistenceError(
-                  `#${tree.id}[${tree.title}]`,
-                  String(child.id)
-                )
-              }
-              if (!(childBookmark instanceof Bookmark)) {
-                childBookmark = new Bookmark(childBookmark)
-              }
-              childBookmark = childBookmark.clone()
-              childBookmark.id = childBookmark.id + ';' + tree.id
-              childBookmark.parentId = tree.id
-              tree.children.push(childBookmark)
-            }
-          },
-          1
-        )
-        tree.loaded = true
-        if (layers === 0) {
-          return
+          return new Bookmark({
+            id: item.id + ';' + folderId,
+            title: item.title,
+            parentId: folderId,
+            url: item.target || item.url,
+            location: ItemLocation.SERVER,
+          })
+        } else if (item.type === 'folder') {
+          const childFolder = new Folder({
+            id: item.id,
+            parentId: folderId,
+            title: item.title,
+            location: ItemLocation.SERVER,
+          })
+          childFolder.loaded = Boolean(item.children) // not children.length but whether the whole children field exists
+          childFolder.children = recurseChildren(item.id, item.children || [])
+          return childFolder
         }
-
-        const nextLayer = layers < 0 ? -1 : layers - 1
-        await Parallel.each(
-          folders.filter(Boolean),
-          async({ newFolder, child, folder}) => {
-            if (typeof child.children === 'undefined') {
-              child.children = await this._getChildOrder(child.id, nextLayer)
-            }
-            if (typeof folder.children === 'undefined') {
-              folder.children = await this._getChildFolders(folder.id, nextLayer)
-            }
-            const childBookmarks = this.list ||
-            await this.sendRequest(
-              'GET',
-              `index.php/apps/bookmarks/public/rest/v2/bookmark?folder=${newFolder.id}&page=-1`
-            ).then((json) => json.data)
-
-            // ... and recurse
-            return recurseChildFolders(newFolder, folder.children, child.children, childBookmarks, nextLayer)
-          },
-          3
-        )
-      }
-      await recurseChildFolders(tree, childFolders, childrenOrder, childBookmarks, layers)
-      return tree.children.filter(item => item.id !== this.lockId)
+      })
     }
+    return recurseChildren(folderId, children)
   }
 
-  async loadFolderChildren(folderId:string|number, all?: boolean): Promise<TItem[]> {
-    if (!this.hasFeatureHashing) {
-      return
-    }
+  async loadFolderChildren(folderId:string|number, all?: boolean): Promise<TItem<typeof ItemLocation.SERVER>[]> {
     const folder = this.tree.findFolder(folderId)
     if (!folder) {
       throw new Error('Could not find folder for loadFolderChildren')
@@ -493,7 +385,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
             child.hashValue = { true: folderHash }
           }
           await recurse(child.children)
-        })
+        }, 5)
       }
       await recurse(children)
     }
@@ -503,7 +395,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return folder.clone(true).children
   }
 
-  async createFolder(folder:Folder):Promise<string|number> {
+  async createFolder(folder:Folder<typeof ItemLocation.SERVER>):Promise<string|number> {
     Logger.log('(nextcloud-folders)CREATEFOLDER', {folder})
     const parentId = folder.parentId
     const title = folder.title
@@ -533,12 +425,12 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return json.item.id
   }
 
-  async bulkImportFolder(parentId:string|number, folder:Folder):Promise<Folder> {
+  async bulkImportFolder(parentId:string|number, folder:Folder<typeof ItemLocation.SERVER>):Promise<Folder<typeof ItemLocation.SERVER>> {
     if (this.hasFeatureBulkImport === false) {
       throw new Error('Current server does not support bulk import')
     }
-    if (folder.count() > 300) {
-      throw new Error('Refusing to bulk import more than 300 bookmarks')
+    if (folder.count() > 75) {
+      throw new Error('Refusing to bulk import more than 75 bookmarks')
     }
     Logger.log('(nextcloud-folders)BULKIMPORT', { parentId, folder })
     const parentFolder = this.tree.findFolder(parentId)
@@ -583,7 +475,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
             return new Bookmark({
               id: item.id + ';' + id,
               title: item.title,
-              url: item.url,
+              url: item.target || item.url,
               parentId: id,
               location: ItemLocation.SERVER,
             })
@@ -602,7 +494,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return imported
   }
 
-  async updateFolder(folder:Folder):Promise<void> {
+  async updateFolder(folder:Folder<typeof ItemLocation.SERVER>):Promise<void> {
     Logger.log('(nextcloud-folders)UPDATEFOLDER', { folder })
     const id = folder.id
     const oldFolder = this.tree.findFolder(folder.id)
@@ -639,7 +531,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     this.tree.createIndex()
   }
 
-  async orderFolder(id:string|number, order:Ordering):Promise<void> {
+  async orderFolder(id:string|number, order:Ordering<typeof ItemLocation.SERVER>):Promise<void> {
     Logger.log('(nextcloud-folders)ORDERFOLDER', { id, order })
     const body = {
       data: order.map((item) => ({
@@ -655,7 +547,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     )
   }
 
-  async removeFolder(folder:Folder):Promise<void> {
+  async removeFolder(folder:Folder<typeof ItemLocation.SERVER>):Promise<void> {
     Logger.log('(nextcloud-folders)REMOVEFOLDER', { folder })
     const id = folder.id
     const oldFolder = this.tree.findFolder(id)
@@ -675,7 +567,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     }
   }
 
-  async _getBookmark(id:string|number):Promise<Bookmark[]> {
+  async _getBookmark(id:string|number):Promise<Bookmark<typeof ItemLocation.SERVER>[]> {
     Logger.log('Fetching single bookmark')
 
     const json = await this.sendRequest(
@@ -693,7 +585,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     return bm.folders.map((parentId) => {
       return new Bookmark({
         id: bm.id + ';' + parentId,
-        url: bm.url,
+        url: bm.target || bm.url,
         title: bm.title,
         parentId: parentId,
         tags: bm.tags,
@@ -702,37 +594,55 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     })
   }
 
-  /*
-   * This is pretty expensive! We need to wait until NcBookmarks has support for
-   * querying urls directly
-   */
-  async getExistingBookmark(url:string):Promise<false|Bookmark> {
-    if (this.hasFeatureExistenceCheck) {
+  async getExistingBookmark(url:string):Promise<false|Bookmark<typeof ItemLocation.SERVER>> {
+    if (url.toLowerCase().startsWith('javascript:')) {
+      if (!this.hasFeatureJavascriptLinks) {
+        return false
+      }
       const json = await this.sendRequest(
         'GET',
-        `index.php/apps/bookmarks/public/rest/v2/bookmark?url=${encodeURIComponent(
-          url
+        `index.php/apps/bookmarks/public/rest/v2/bookmark?page=-1&search[]=${encodeURIComponent(
+          'javascript:'
         )}`
       )
       if (json.data.length) {
-        return {...json.data[0], parentId: json.data[0].folders[0]}
+        const bookmark = json.data.find(bookmark => bookmark.target === url)
+        if (bookmark) {
+          return {...bookmark, parentId: bookmark.folders[0], url}
+        } else {
+          return false
+        }
       } else {
         return false
       }
+    }
+    const json = await this.sendRequest(
+      'GET',
+      `index.php/apps/bookmarks/public/rest/v2/bookmark?url=${encodeURIComponent(
+        url
+      )}`
+    )
+    if (json.data.length) {
+      return {...json.data[0], parentId: json.data[0].folders[0], url}
     } else {
-      await this.getBookmarksList()
-      const existing = this.list.find((bookmark) => bookmark.url === url)
-      if (!existing) return false
-      return existing
+      return false
     }
   }
 
-  async createBookmark(bm:Bookmark):Promise<string|number> {
+  async createBookmark(bm:Bookmark<typeof ItemLocation.SERVER>):Promise<string|number> {
     Logger.log('(nextcloud-folders)CREATE', bm)
 
     // We need this lock to avoid creating two boomarks with the same url
     // in parallel
     return this.bookmarkLock.acquire(bm.url, async() => {
+      let newParentFolder
+      if (this.tree) {
+        newParentFolder = this.tree.findFolder(bm.parentId)
+        if (!newParentFolder) {
+          throw new UnknownCreateTargetError()
+        }
+      }
+
       const existingBookmark = await this.getExistingBookmark(bm.url)
       if (existingBookmark) {
         bm.id = existingBookmark.id + ';' + bm.parentId // We already use the new parentId here, to avoid moving it away from the old location
@@ -746,12 +656,20 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
           folders: [bm.parentId],
         }
 
-        const json = await this.sendRequest(
-          'POST',
-          'index.php/apps/bookmarks/public/rest/v2/bookmark',
-          'application/json',
-          body
-        )
+        let json
+        try {
+          json = await this.sendRequest(
+            'POST',
+            'index.php/apps/bookmarks/public/rest/v2/bookmark',
+            'application/json',
+            body
+          )
+        } catch (e) {
+          if (e instanceof HttpError) {
+            throw new CreateBookmarkError(bm)
+          }
+          throw e
+        }
         if (typeof json.item !== 'object') {
           throw new UnexpectedServerResponseError()
         }
@@ -761,14 +679,16 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
       const upstreamMark = bm.clone()
       upstreamMark.id = bm.id.split(';')[0]
       this.list && this.list.push(upstreamMark)
-      this.tree.findFolder(bm.parentId).children.push(upstreamMark)
-      this.tree.createIndex()
+      if (this.tree) {
+        newParentFolder.children.push(upstreamMark)
+        this.tree.createIndex()
+      }
 
       return bm.id
     })
   }
 
-  async updateBookmark(newBm:Bookmark):Promise<void> {
+  async updateBookmark(newBm:Bookmark<typeof ItemLocation.SERVER>):Promise<void> {
     Logger.log('(nextcloud-folders)UPDATE', newBm)
 
     const [upstreamId, oldParentId] = String(newBm.id).split(';')
@@ -777,6 +697,11 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     // in parallel
     return this.bookmarkLock.acquire(upstreamId, async() => {
       const bms = await this._getBookmark(upstreamId)
+
+      const newFolder = this.tree.findFolder(newBm.parentId)
+      if (!newFolder) {
+        throw new UnknownCreateTargetError()
+      }
 
       const body = {
         url: newBm.url,
@@ -793,15 +718,21 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
         tags: bms[0].tags,
       }
 
-      await this.sendRequest(
-        'PUT',
-        `index.php/apps/bookmarks/public/rest/v2/bookmark/${upstreamId}`,
-        'application/json',
-        body
-      )
+      try {
+        await this.sendRequest(
+          'PUT',
+          `index.php/apps/bookmarks/public/rest/v2/bookmark/${upstreamId}`,
+          'application/json',
+          body
+        )
+      } catch (e) {
+        if (e instanceof HttpError) {
+          throw new UpdateBookmarkError(newBm)
+        }
+        throw e
+      }
 
-      const newFolder = this.tree.findFolder(newBm.parentId)
-      if (!newFolder.children.find(item => item.id === newBm.id && item.type === 'bookmark')) {
+      if (!newFolder.children.find(item => String(item.id) === String(newBm.id) && item.type === 'bookmark')) {
         newFolder.children.push(newBm)
       }
       newBm.id = upstreamId + ';' + newBm.parentId
@@ -811,7 +742,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     })
   }
 
-  async removeBookmark(bookmark:Bookmark):Promise<void> {
+  async removeBookmark(bookmark:Bookmark<typeof ItemLocation.SERVER>):Promise<void> {
     Logger.log('(nextcloud-folders)REMOVE', { bookmark })
     const id = bookmark.id
     const [upstreamId, parentId] = String(id).split(';')
@@ -835,22 +766,35 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     })
   }
 
-  async sendRequest(verb:string, relUrl:string, type:string = null, body:any = null, returnRawResponse = false):Promise<any> {
-    const deviceInfo = await Device.getInfo()
-    if (deviceInfo.platform === 'web') {
-      return this.sendRequestWeb(verb, relUrl, type, body, returnRawResponse)
-    } else {
-      return this.sendRequestNative(verb, relUrl, type, body, returnRawResponse)
+  async checkFeatureJavascriptLinks(): Promise<void> {
+    if (this.hasFeatureJavascriptLinks !== null) {
+      return
+    }
+    try {
+      const json = await this.sendRequest(
+        'GET',
+        `index.php/apps/bookmarks/public/rest/v2/bookmark?page=1&limit=1`
+      )
+      if (!json.data.length) {
+        this.hasFeatureJavascriptLinks = true
+        try {
+          const id = await this.createBookmark(new Bookmark({id: null, parentId: '-1', title: 'floccus', url: 'javascript:void(0)', location: ItemLocation.SERVER}))
+          await this.removeBookmark(new Bookmark({id, parentId: '-1', title: 'floccus', url: 'javascript:void(0)', location: ItemLocation.SERVER}))
+        } catch (e) {
+          this.hasFeatureJavascriptLinks = false
+        }
+        return
+      }
+      this.hasFeatureJavascriptLinks = 'target' in json.data[0]
+    } catch (e) {
+      this.hasFeatureJavascriptLinks = false
     }
   }
 
-  async sendRequestWeb(verb:string, relUrl:string, type:string = null, body:any = null, returnRawResponse = false):Promise<any> {
+  async sendRequest(verb:string, relUrl:string, type:string = null, body:any = null, returnRawResponse = false):Promise<any> {
     const url = this.normalizeServerURL(this.server.url) + relUrl
     let res
     let timedOut = false
-    const authString = Base64.encode(
-      this.server.username + ':' + this.server.password
-    )
 
     if (type && type.includes('application/json')) {
       body = JSON.stringify(body)
@@ -862,9 +806,20 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
       body = params.toString()
     }
 
+    Logger.log(`QUEUING ${verb} ${url}`)
+
+    if (Capacitor.getPlatform() !== 'web') {
+      return this.sendRequestNative(verb, url, type, body, returnRawResponse)
+    }
+
+    const authString = Base64.encode(
+      this.server.username + ':' + this.server.password
+    )
+
     try {
-      res = await this.fetchQueue.add(() =>
-        Promise.race([
+      res = await this.fetchQueue.add(() => {
+        Logger.log(`FETCHING ${verb} ${url}`)
+        return Promise.race([
           fetch(url, {
             method: verb,
             credentials: this.server.includeCredentials ? 'include' : 'omit',
@@ -872,6 +827,7 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
               ...(type && type !== 'multipart/form-data' && { 'Content-type': type }),
               Authorization: 'Basic ' + authString,
             },
+            signal: this.abortSignal,
             ...(body && !['get', 'head'].includes(verb.toLowerCase()) && { body }),
           }),
           new Promise((resolve, reject) =>
@@ -881,12 +837,15 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
             }, TIMEOUT)
           ),
         ])
-      )
+      })
     } catch (e) {
       if (timedOut) throw e
+      if (this.canceled) throw new CancelledSyncError()
       console.log(e)
       throw new NetworkError()
     }
+
+    Logger.log(`Receiving response for ${verb} ${url}`)
 
     if (res.redirected && !this.server.allowRedirects) {
       throw new RedirectError()
@@ -899,7 +858,8 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     if (res.status === 401 || res.status === 403) {
       throw new AuthenticationError()
     }
-    if (res.status === 503) {
+    if (res.status === 503 || res.status >= 400) {
+      Logger.log(`${verb} ${url}: Server responded with ${res.status}: ` + (await res.text()).substring(0, 250))
       throw new HttpError(res.status, verb)
     }
     let json
@@ -909,97 +869,41 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
       throw new ParseResponseError(e.message)
     }
     if (json.status !== 'success') {
-      throw new Error('Nextcloud API error: \n' + JSON.stringify(json))
-    }
-
-    return json
-  }
-
-  async sendRequestNative(verb:string, relUrl:string, type:string = null, body:any = null, returnRawResponse = false):Promise<any> {
-    let url = this.normalizeServerURL(this.server.url) + relUrl
-    let res
-    let timedOut = false
-    const authString = Base64.encode(
-      this.server.username + ':' + this.server.password
-    )
-    try {
-      if (url.includes('?')) {
-        url = url.substr(0, url.indexOf('?'))
-      }
-      res = await this.fetchQueue.add(() =>
-        Promise.race([
-          Http.request({
-            url,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            params: Object.fromEntries(new URL(url).searchParams.entries()),
-            shouldEncodeUrlParams: false,
-            method: verb,
-            headers: {
-              ...(type && { 'Content-type': type }),
-              Authorization: 'Basic ' + authString,
-            },
-            ...(body && { data: body }),
-            webFetchExtra: {
-              credentials: this.server.includeCredentials ? 'include' : 'omit',
-            }
-          }),
-          new Promise((resolve, reject) =>
-            setTimeout(() => {
-              timedOut = true
-              reject(new RequestTimeoutError())
-            }, TIMEOUT)
-          ),
-        ])
-      )
-    } catch (e) {
-      if (timedOut) throw e
-      throw new NetworkError()
-    }
-
-    if (returnRawResponse) {
-      return res
-    }
-
-    if (res.status === 401 || res.status === 403) {
-      throw new AuthenticationError()
-    }
-    if (res.status === 503) {
-      throw new HttpError(res.status, verb)
-    }
-    const json = res.data
-
-    if (typeof json !== 'object') {
-      throw new ParseResponseError(res.data.substr(0, 10))
-    }
-
-    if (json.status !== 'success') {
-      throw new Error('Nextcloud API error: \n' + JSON.stringify(json))
+      throw new Error('Nextcloud API error for request ' + verb + ' ' + relUrl + ' : \n' + JSON.stringify(json))
     }
 
     return json
   }
 
   private async acquireLock():Promise<boolean> {
-    const res = await this.sendRequest(
-      'POST',
-      'index.php/apps/bookmarks/public/rest/v2/lock',
-      null,
-      null,
-      true
-    )
+    this.lockingPromise = (async() => {
+      const res = await this.sendRequest(
+        'POST',
+        'index.php/apps/bookmarks/public/rest/v2/lock',
+        null,
+        null,
+        true
+      )
 
-    if (res.status === 401 || res.status === 403) {
-      throw new AuthenticationError()
-    }
-    if (res.status !== 200 && res.status !== 405 && res.status !== 423) {
-      throw new HttpError(res.status, 'POST')
-    }
+      if (res.status === 401 || res.status === 403) {
+        throw new AuthenticationError()
+      }
+      if (res.status !== 200 && res.status !== 405 && res.status !== 423) {
+        throw new HttpError(res.status, 'POST')
+      }
 
-    return res.status === 200 || res.status === 405
+      return res.status === 200 || res.status === 405
+    })()
+    return this.lockingPromise
   }
 
   private async releaseLock():Promise<boolean> {
+    if (this.lockingPromise) {
+      await this.lockingPromise
+    }
+    if (!this.locked) {
+      return
+    }
     const res = await this.sendRequest(
       'DELETE',
       'index.php/apps/bookmarks/public/rest/v2/lock',
@@ -1009,5 +913,83 @@ export default class NextcloudBookmarksAdapter implements Adapter, BulkImportRes
     )
 
     return res.status === 200
+  }
+
+  private async sendRequestNative(verb: string, url: string, type: string, body: any, returnRawResponse: boolean) {
+    let res
+    let timedOut = false
+    const authString = Base64.encode(
+      this.server.username + ':' + this.server.password
+    )
+    try {
+      res = await this.fetchQueue.add(() => {
+        Logger.log(`FETCHING ${verb} ${url}`)
+        return Promise.race([
+          Http.request({
+            url,
+            method: verb,
+            disableRedirects: !this.server.allowRedirects,
+            headers: {
+              ...(type && type !== 'multipart/form-data' && { 'Content-type': type }),
+              Authorization: 'Basic ' + authString,
+            },
+            responseType: 'json',
+            ...(body && !['get', 'head'].includes(verb.toLowerCase()) && { data: body }),
+          }),
+          new Promise((resolve, reject) =>
+            setTimeout(() => {
+              timedOut = true
+              reject(new RequestTimeoutError())
+            }, TIMEOUT)
+          ),
+        ])
+      })
+    } catch (e) {
+      if (timedOut) throw e
+      console.log(e)
+      throw new NetworkError()
+    }
+
+    Logger.log(`Receiving response for ${verb} ${url}`)
+
+    if (res.status < 400 && res.status >= 300) {
+      throw new RedirectError()
+    }
+
+    if (returnRawResponse) {
+      return res
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthenticationError()
+    }
+    if (res.status === 503 || res.status >= 400) {
+      throw new HttpError(res.status, verb)
+    }
+    const json = res.data
+    if (json.status !== 'success') {
+      throw new Error('Nextcloud API error for request ' + verb + ' ' + url + ' : \n' + JSON.stringify(json))
+    }
+
+    return json
+  }
+
+  isAvailable(): Promise<boolean> {
+    return Promise.resolve(true)
+  }
+
+  async countClick(url: string): Promise<void> {
+    try {
+      await this.sendRequest(
+        'POST',
+        'index.php/apps/bookmarks/public/rest/v2/bookmark/click',
+        'application/json',
+        {
+          url,
+        }
+      )
+    } catch (e) {
+      console.warn(e)
+    }
   }
 }
