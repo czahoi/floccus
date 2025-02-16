@@ -4,9 +4,18 @@
   "bundledWebRuntime": false,
   "npmClient": "npm",
   "webDir": "dist",
+  "loggingBehavior": "production",
+  "server": {
+    "androidScheme": "http"
+  },
   "plugins": {
     "SplashScreen": {
-        "launchAutoHide": false
+        "launchAutoHide": false,
+        "androidScaleType": "CENTER_INSIDE",
+        "backgroundColor": "#ffffff"
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   },
   "cordova": {}

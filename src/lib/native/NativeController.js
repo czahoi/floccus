@@ -1,33 +1,44 @@
-import { Storage } from '@capacitor/storage'
-import NativeAccount from './NativeAccount'
-import NativeTree from './NativeTree'
+import { Preferences as Storage } from '@capacitor/preferences'
+import { Network } from '@capacitor/network'
 import Cryptography from '../Crypto'
-import packageJson from '../../../package.json'
 import NativeAccountStorage from './NativeAccountStorage'
-import {i18n} from './I18n'
-import _ from 'lodash'
+import Account from '../Account'
+import { STATUS_ALLGOOD, STATUS_DISABLED, STATUS_ERROR, STATUS_SYNCING } from '../interfaces/Controller'
 
-import PQueue from 'p-queue'
-
-const INACTIVITY_TIMEOUT = 1000 * 60
+const INACTIVITY_TIMEOUT = 1000 * 7
 const DEFAULT_SYNC_INTERVAL = 15
 
 class AlarmManager {
   constructor(ctl) {
     this.ctl = ctl
-    setInterval(() => this.checkSync(), 60 * 1000)
+    this.backgroundSyncEnabled = true
+    setInterval(() => this.checkSync(), 25 * 1000)
+
+    Network.addListener('networkStatusChange', status => {
+      if (status.connected) {
+        this.backgroundSyncEnabled = true
+      } else {
+        this.backgroundSyncEnabled = false
+      }
+    })
   }
 
   async checkSync() {
+    if (!this.backgroundSyncEnabled) {
+      return
+    }
     const accounts = await NativeAccountStorage.getAllAccounts()
     for (let accountId of accounts) {
-      const account = await NativeAccount.get(accountId)
+      const account = await Account.get(accountId)
       const data = account.getData()
-      if (!data.lastSync ||
+      if (data.scheduled) {
+        this.ctl.scheduleSync(accountId)
+      }
+      if (
+        !data.lastSync ||
         Date.now() >
         (data.syncInterval || DEFAULT_SYNC_INTERVAL) * 1000 * 60 + data.lastSync
       ) {
-        // noinspection ES6MissingAwait
         this.ctl.scheduleSync(accountId)
       }
     }
@@ -36,8 +47,6 @@ class AlarmManager {
 
 export default class NativeController {
   constructor() {
-    this.jobs = new PQueue({ concurrency: 1 })
-    this.waiting = {}
     this.schedule = {}
     this.listeners = []
 
@@ -52,43 +61,10 @@ export default class NativeController {
         this.key = null
       }
     })
-
-    // do some cleaning if this is a new version
-
-    Storage.get({key: 'currentVersion'}).then(async({value: currentVersion}) => {
-      if (packageJson.version === currentVersion) return
-      await Storage.set({key: 'currentVersion', value: packageJson.version})
-
-      const packageVersion = packageJson.version.split('.')
-      const lastVersion = currentVersion ? currentVersion.split('.') : []
-      if (packageVersion[0] !== lastVersion[0] || packageVersion[1] !== lastVersion[1]) {
-        // TODO display '/dist/html/options.html#/update',
-      }
-    })
   }
 
   setEnabled(enabled) {
     this.enabled = enabled
-  }
-
-  async setKey(key) {
-    let accounts = await NativeAccount.getAllAccounts()
-    await Promise.all(accounts.map(a => a.updateFromStorage()))
-    this.key = key
-    let hashedKey = await Cryptography.sha256(key)
-    let encryptedHash = await Cryptography.encryptAES(
-      key,
-      hashedKey,
-      'FLOCCUS'
-    )
-    await Storage.set({ key: 'accountsLocked', value: encryptedHash })
-    if (accounts.length) {
-      await Promise.all(accounts.map(a => a.setData(a.getData())))
-    }
-
-    // ...aand unlock it immediately.
-    this.unlocked = true
-    this.setEnabled(true)
   }
 
   async unlock(key) {
@@ -110,67 +86,15 @@ export default class NativeController {
     this.setEnabled(true)
   }
 
-  async unsetKey() {
-    if (!this.unlocked) {
-      throw new Error('Cannot disable encryption without unlocking first')
-    }
-    let accounts = await NativeAccount.getAllAccounts()
-    await Promise.all(accounts.map(a => a.updateFromStorage()))
-    this.key = null
-    await Storage.set({ key: 'accountsLocked', value: null })
-    await Promise.all(accounts.map(a => a.setData(a.getData())))
+  getUnlocked() {
+    return Promise.resolve(this.unlocked)
   }
 
-  async onchange(localId, details) {
-    if (!this.enabled) {
-      return
+  async scheduleAll() {
+    const accounts = await Account.getAllAccounts()
+    for (const account of accounts) {
+      this.scheduleSync(account.id)
     }
-    // Debounce this function
-    this.setEnabled(false)
-
-    const allAccounts = await NativeAccount.getAllAccounts()
-
-    // Check which accounts contain the bookmark and which used to contain (track) it
-    const trackingAccountsFilter = await Promise.all(
-      allAccounts.map(async account => {
-        return account.tracksBookmark(localId)
-      })
-    )
-
-    let accountsToSync = allAccounts
-      // Filter out any accounts that are not tracking the bookmark
-      .filter((account, i) => trackingAccountsFilter[i])
-
-    // Now we check the account of the new folder
-
-    let ancestors
-    try {
-      ancestors = await NativeTree.getIdPathFromLocalId(localId)
-    } catch (e) {
-      this.setEnabled(true)
-      return
-    }
-
-    const containingAccounts = await NativeAccount.getAccountsContainingLocalId(
-      localId,
-      ancestors,
-      allAccounts
-    )
-    accountsToSync = _.uniqBy(
-      accountsToSync.concat(containingAccounts),
-      acc => acc.id)
-      // Filter out any accounts that are presently syncing
-      .filter(account => !account.getData().syncing)
-      // Filter out accounts that are not enabled
-      .filter(account => account.getData().enabled)
-
-    // schedule a new sync for all accounts involved
-    accountsToSync.forEach(account => {
-      this.cancelSync(account.id, true)
-      this.scheduleSync(account.id, true)
-    })
-
-    this.setEnabled(true)
   }
 
   async scheduleSync(accountId, wait) {
@@ -185,44 +109,48 @@ export default class NativeController {
       return
     }
 
-    let account = await NativeAccount.get(accountId)
+    let account = await Account.get(accountId)
     if (account.getData().syncing) {
       return
     }
-    if (!account.getData().enabled) {
+    // if the account is already scheduled, don't prevent it, to avoid getting stuck
+    if (!account.getData().enabled && !account.getData().scheduled) {
       return
     }
 
-    if (this.waiting[accountId]) {
+    const status = await this.getStatus()
+    if (status === STATUS_SYNCING) {
+      await account.setData({ scheduled: account.getData().scheduled || true })
       return
     }
 
-    this.waiting[accountId] = true
-
-    return this.jobs.add(() => this.syncAccount(accountId))
+    if (account.getData().scheduled === true) {
+      await this.syncAccount(accountId)
+    } else {
+      await this.syncAccount(accountId, account.getData().scheduled)
+    }
   }
 
   async cancelSync(accountId, keepEnabled) {
-    let account = await NativeAccount.get(accountId)
+    let account = await Account.get(accountId)
     // Avoid starting it again automatically
     if (!keepEnabled) {
-      await account.setData({ ...account.getData(), enabled: false })
+      await account.setData({ enabled: false })
     }
     await account.cancelSync()
   }
 
-  async syncAccount(accountId, strategy) {
-    this.waiting[accountId] = false
+  async syncAccount(accountId, strategy, forceSync = false) {
     if (!this.enabled) {
       return
     }
-    let account = await NativeAccount.get(accountId)
+    let account = await Account.get(accountId)
     if (account.getData().syncing) {
       return
     }
     setTimeout(() => this.updateStatus(), 500)
     try {
-      await account.sync(strategy)
+      await account.sync(strategy, forceSync)
     } catch (error) {
       console.error(error)
     }
@@ -231,6 +159,31 @@ export default class NativeController {
 
   async updateStatus() {
     this.listeners.forEach(fn => fn())
+  }
+
+  async getStatus() {
+    if (!this.unlocked) {
+      return STATUS_ERROR
+    }
+    const accounts = await Account.getAllAccounts()
+    let overallStatus = accounts.reduce((status, account) => {
+      const accData = account.getData()
+      if (status === STATUS_SYNCING || accData.syncing) {
+        return STATUS_SYNCING
+      } else if (status === STATUS_ERROR || (accData.error && !accData.syncing)) {
+        return STATUS_ERROR
+      } else {
+        return STATUS_ALLGOOD
+      }
+    }, STATUS_ALLGOOD)
+
+    if (overallStatus === STATUS_ALLGOOD) {
+      if (accounts.every(account => !account.getData().enabled)) {
+        overallStatus = STATUS_DISABLED
+      }
+    }
+
+    return overallStatus
   }
 
   onStatusChange(listener) {
@@ -244,14 +197,13 @@ export default class NativeController {
   }
 
   async onLoad() {
-    const accounts = await NativeAccount.getAllAccounts()
+    const accounts = await Account.getAllAccounts()
     await Promise.all(
       accounts.map(async acc => {
         if (acc.getData().syncing) {
           await acc.setData({
-            ...acc.getData(),
             syncing: false,
-            error: i18n.getMessage('Error027')
+            scheduled: false,
           })
         }
       })

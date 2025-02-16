@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.handmadeideas.floccus">
+    >
 
     <application
         android:allowBackup="true"
@@ -9,9 +9,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:largeHeap="true">
 
         <activity
+            android:exported="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:name="org.handmadeideas.floccus.MainActivity"
             android:label="@string/title_activity_main"
@@ -24,14 +26,27 @@
             </intent-filter>
 
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                        android:host="@string/oauth_redirect_host"
+                        android:scheme="@string/package_name" />
+            </intent-filter>
+        </activity>
 
+        <activity
+            android:name="de.mindlib.sendIntent.SendIntentActivity"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <!-- Depending on your project, you can add here the type of data you wish to receive -->
                 <data android:mimeType="text/plain" />
             </intent-filter>
-
         </activity>
 
         <provider
@@ -41,11 +56,13 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+                android:resource="@xml/file_paths"/>
         </provider>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 </manifest>

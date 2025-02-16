@@ -1,3 +1,5 @@
+import { Bookmark, TItemLocation } from '../lib/Tree'
+
 export class FloccusError extends Error {
   public code: number
 
@@ -129,7 +131,7 @@ export class RequestTimeoutError extends FloccusError {
 
 export class NetworkError extends FloccusError {
   constructor() {
-    super('E017: Network error: Check your network connection and your account details')
+    super('E017: Network error: Check your network connection and your profile details')
     this.code = 17
     Object.setPrototypeOf(this, NetworkError.prototype)
   }
@@ -220,12 +222,15 @@ export class SlashError extends FloccusError {
   }
 }
 
-// code 26 is unused
+export class CancelledSyncError extends FloccusError {
+  constructor() {
+    super('E026: Sync process was cancelled')
+    this.code = 26
+    Object.setPrototypeOf(this, InterruptedSyncError.prototype)
+  }
+}
 
 export class InterruptedSyncError extends FloccusError {
-  public status: number
-  public lockFile: string
-
   constructor() {
     super('E027: Sync process was interrupted')
     this.code = 27
@@ -239,7 +244,7 @@ export class FailsafeError extends FloccusError {
   public percent: number
 
   constructor(percent:number) {
-    super(`E029: Failsafe: The current sync run would delete ${percent}% of your bookmarks. Refusing to execute. Disable this failsafe in the account settings if you want to proceed anyway.`)
+    super(`E029: Failsafe: The current sync run would delete ${percent}% of your bookmarks. Refusing to execute. Disable this failsafe in the profile settings if you want to proceed anyway.`)
     this.code = 29
     this.percent = percent
     Object.setPrototypeOf(this, FailsafeError.prototype)
@@ -280,8 +285,60 @@ export class RedirectError extends FloccusError {
 
 export class FileUnreadableError extends FloccusError {
   constructor() {
-    super('E034: Bookmarks file is unreadable. Did you forget to set an encryption passphrase?')
+    super('E034: Remote bookmarks file is unreadable. Perhaps you forgot to set an encryption passphrase, or you set the wrong file format.')
     this.code = 34
     Object.setPrototypeOf(this, FileUnreadableError.prototype)
+  }
+}
+
+export class CreateBookmarkError extends FloccusError {
+  public bookmark: Bookmark<TItemLocation>
+  constructor(bookmark: Bookmark<TItemLocation>) {
+    super(`E035: Failed to create the following bookmark on the server: ${bookmark.inspect()}`)
+    this.code = 35
+    this.bookmark = bookmark
+    Object.setPrototypeOf(this, CreateBookmarkError.prototype)
+  }
+}
+
+export class MissingPermissionsError extends FloccusError {
+  constructor() {
+    super(`E036: Missing permissions to access the sync server`)
+    this.code = 36
+    Object.setPrototypeOf(this, MissingPermissionsError.prototype)
+  }
+}
+
+export class ResourceLockedError extends FloccusError {
+  constructor() {
+    super(`E037: Resource is locked`)
+    this.code = 37
+    Object.setPrototypeOf(this, ResourceLockedError.prototype)
+  }
+}
+
+export class LocalFolderNotFoundError extends FloccusError {
+  constructor() {
+    super(`E038: Could not find local folder`)
+    this.code = 38
+    Object.setPrototypeOf(this, LocalFolderNotFoundError.prototype)
+  }
+}
+
+export class UpdateBookmarkError extends FloccusError {
+  public bookmark: Bookmark<TItemLocation>
+  constructor(bookmark: Bookmark<TItemLocation>) {
+    super(`E039: Failed to update the following bookmark on the server: ${bookmark.inspect()}`)
+    this.code = 39
+    this.bookmark = bookmark
+    Object.setPrototypeOf(this, UpdateBookmarkError.prototype)
+  }
+}
+
+export class GoogleDriveSearchError extends FloccusError {
+  constructor() {
+    super('E040: Could not search for your file name in your Google Drive')
+    this.code = 40
+    Object.setPrototypeOf(this, GoogleDriveSearchError.prototype)
   }
 }

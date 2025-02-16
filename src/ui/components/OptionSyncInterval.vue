@@ -12,10 +12,9 @@
       :max="syncIntervalSteps.length-1"
       :step="1"
       :persistent-hint="true"
-      :rules="[Boolean]"
       :thumb-label="'always'"
       :ticks="'always'">
-      <template v-slot:thumb-label="{ value: step }">
+      <template #thumb-label="{ value: step }">
         {{ humanizeDuration(syncIntervalSteps[step] * 1000 * 60) }}
       </template>
     </v-slider>
@@ -44,7 +43,7 @@ export default {
         const newDelta = Math.abs(value - this.value)
         if (currentDelta > newDelta) return index
         else return closestIndex
-      }, 0) || steps.indexOf(15)
+      }, 0)
     }
   },
   watch: {
@@ -54,7 +53,7 @@ export default {
         const newDelta = Math.abs(value - this.value)
         if (currentDelta > newDelta) return index
         else return closestIndex
-      }, 0) || this.syncIntervalSteps.indexOf(15)
+      }, 0)
     },
     syncIntervalStep(step) {
       this.$emit('input', this.syncIntervalSteps[step])

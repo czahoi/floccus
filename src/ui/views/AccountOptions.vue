@@ -138,8 +138,18 @@
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
+              <OptionsLinkwarden
+                v-if="data.type === 'linkwarden'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
               <OptionsWebdav
                 v-if="data.type === 'webdav'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
+              <OptionsGit
+                v-if="data.type === 'git'"
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
@@ -186,16 +196,17 @@
 <script>
 import PathHelper from '../../lib/PathHelper'
 import BrowserTree from '../../lib/browser/BrowserTree'
-import { actions } from '../store'
+import { actions } from '../store/definitions'
 import OptionsNextcloudFolders from '../components/OptionsNextcloudBookmarks'
+import OptionsLinkwarden from '../components/OptionsLinkwarden'
 import OptionsWebdav from '../components/OptionsWebdav'
 import OptionsFake from '../components/OptionsFake'
 import OptionsGoogleDrive from '../components/OptionsGoogleDrive'
-// import OptionsGoogleDrive from '../components/OptionsGoogleDrive'
+import OptionsGit from '../components/OptionsGit.vue'
 
 export default {
   name: 'AccountOptions',
-  components: { OptionsGoogleDrive, OptionsFake, OptionsWebdav, OptionsNextcloudFolders },
+  components: { OptionsGit, OptionsGoogleDrive, OptionsFake, OptionsWebdav, OptionsNextcloudFolders, OptionsLinkwarden },
   data() {
     return {
       folderName: '',
@@ -265,5 +276,9 @@ export default {
     }
     .v-form .v-icon {
       margin-right: 10px;
+    }
+
+    .text-h6 {
+      margin-top: 20px;
     }
 </style>

@@ -1,5 +1,15 @@
 <template>
   <v-container>
+    <div>
+      <v-text-field
+        append-icon="mdi-label"
+        class="mt-2 mb-4"
+        :value="label"
+        :label="t('LabelAccountlabel')"
+        :hint="t('DescriptionAccountlabel')"
+        :persistent-hint="true"
+        @input="$emit('update:label', $event)" />
+    </div>
     <v-card class="mb-4">
       <v-card-title
         id="server">
@@ -47,6 +57,23 @@
       </v-card-text>
     </v-card>
 
+    <v-card
+      v-if="!isBrowser"
+      class="mb-4">
+      <v-card-title
+        id="mobile"
+        class="text-h5">
+        <v-icon>mdi-cellphone-settings</v-icon>
+        {{ t('LabelMobilesettings') }}
+      </v-card-title>
+      <v-card-text>
+        <OptionAllowNetwork
+          :value="allowNetwork"
+          @input="$emit('update:allowNetwork', $event)" />
+        <OptionExportBookmarks />
+      </v-card-text>
+    </v-card>
+
     <v-card class="mb-4">
       <v-card-title
         id="sync"
@@ -55,8 +82,10 @@
         {{ t('LabelOptionsSyncBehavior') }}
       </v-card-title>
       <v-card-text>
+        <OptionAutoSync
+          :value="enabled"
+          @input="$emit('update:enabled', $event)" />
         <OptionSyncInterval
-          v-if="isBrowser"
           :value="syncInterval"
           @input="$emit('update:syncInterval', $event)" />
         <OptionSyncStrategy
@@ -66,6 +95,15 @@
           v-if="isBrowser"
           :value="nestedSync"
           @input="$emit('update:nestedSync', $event)" />
+        <v-switch
+          :input-value="clickCountEnabled"
+          :aria-label="t('LabelClickcount')"
+          :label="t('LabelClickcount')"
+          :hint="t('DescriptionClickcount')"
+          :persistent-hint="true"
+          dense
+          class="mt-0 pt-0"
+          @change="$emit('update:clickCountEnabled', $event); requestHistoryPermissions()" />
       </v-card-text>
     </v-card>
 
@@ -77,6 +115,7 @@
         {{ t('LabelOptionsDangerous') }}
       </v-card-title>
       <v-card-text>
+        <OptionDownloadLogs />
         <OptionClientCert
           v-if="isBrowser"
           :value="includeCredentials"
@@ -106,11 +145,16 @@ import OptionNestedSync from './OptionNestedSync'
 import OptionFailsafe from './OptionFailsafe'
 import OptionClientCert from './OptionClientCert'
 import OptionAllowRedirects from './OptionAllowRedirects'
+import OptionDownloadLogs from './OptionDownloadLogs'
+import OptionAllowNetwork from './native/OptionAllowNetwork'
+import OptionExportBookmarks from './OptionExportBookmarks.vue'
+import { actions } from '../store/definitions'
+import OptionAutoSync from './OptionAutoSync.vue'
 
 export default {
   name: 'OptionsNextcloudBookmarks',
-  components: { OptionAllowRedirects, OptionClientCert, OptionFailsafe, OptionNestedSync, NextcloudLogin, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval },
-  props: ['url', 'username', 'password', 'includeCredentials', 'serverRoot', 'localRoot', 'syncInterval', 'strategy', 'nestedSync', 'failsafe', 'allowRedirects'],
+  components: { OptionAutoSync, OptionExportBookmarks, OptionAllowNetwork, OptionDownloadLogs, OptionAllowRedirects, OptionClientCert, OptionFailsafe, OptionNestedSync, NextcloudLogin, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval },
+  props: ['url', 'username', 'password', 'includeCredentials', 'serverRoot', 'localRoot', 'allowNetwork', 'syncInterval', 'strategy', 'nestedSync', 'failsafe', 'allowRedirects', 'enabled', 'label', 'clickCountEnabled'],
   data() {
     return {
       panels: [0, 1]
@@ -128,6 +172,9 @@ export default {
     validateServerRoot(path) {
       return !path || path === '/' || (path[0] === '/' && path[path.length - 1] !== '/')
     },
+    requestHistoryPermissions() {
+      this.$store.dispatch(actions.REQUEST_HISTORY_PERMISSIONS)
+    }
   }
 }
 </script>

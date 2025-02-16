@@ -1,5 +1,15 @@
 <template>
   <v-container>
+    <div>
+      <v-text-field
+        append-icon="mdi-label"
+        class="mt-2 mb-4"
+        :value="label"
+        :label="t('LabelAccountlabel')"
+        :hint="t('DescriptionAccountlabel')"
+        :persistent-hint="true"
+        @input="$emit('update:label', $event)" />
+    </div>
     <v-card class="mb-4">
       <v-card-title
         id="server"
@@ -34,15 +44,8 @@
           :hint="t('DescriptionBookmarksfilegoogle')"
           :persistent-hint="true"
           @input="$emit('update:bookmark_file', $event)" />
-        <v-text-field
-          :append-icon="showPassphrase ? 'mdi-eye' : 'mdi-eye-off'"
-          :type="showPassphrase ? 'text' : 'password'"
-          class="mt-2"
+        <OptionPassphrase
           :value="password"
-          :label="t('LabelPassphrase')"
-          :hint="t('DescriptionPassphrase')"
-          :persistent-hint="true"
-          @click:append="showPassphrase = !showPassphrase"
           @input="$emit('update:password', $event)" />
       </v-card-text>
     </v-card>
@@ -63,6 +66,23 @@
       </v-card-text>
     </v-card>
 
+    <v-card
+      v-if="!isBrowser"
+      class="mb-4">
+      <v-card-title
+        id="mobile"
+        class="text-h5">
+        <v-icon>mdi-cellphone-settings</v-icon>
+        {{ t('LabelMobilesettings') }}
+      </v-card-title>
+      <v-card-text>
+        <OptionAllowNetwork
+          :value="allowNetwork"
+          @input="$emit('update:allowNetwork', $event)" />
+        <OptionExportBookmarks />
+      </v-card-text>
+    </v-card>
+
     <v-card class="mb-4">
       <v-card-title
         id="sync"
@@ -71,8 +91,10 @@
         {{ t('LabelOptionsSyncBehavior') }}
       </v-card-title>
       <v-card-text>
+        <OptionAutoSync
+          :value="enabled"
+          @input="$emit('update:enabled', $event)" />
         <OptionSyncInterval
-          v-if="isBrowser"
           :value="syncInterval"
           @input="$emit('update:syncInterval', $event)" />
         <OptionSyncStrategy
@@ -93,6 +115,7 @@
         {{ t('LabelOptionsDangerous') }}
       </v-card-title>
       <v-card-text>
+        <OptionDownloadLogs />
         <OptionResetCache @click="$emit('reset')" />
         <OptionFailsafe
           :value="failsafe"
@@ -111,16 +134,21 @@ import OptionDeleteAccount from './OptionDeleteAccount'
 import OptionSyncFolder from './OptionSyncFolder'
 import OptionNestedSync from './OptionNestedSync'
 import OptionFailsafe from './OptionFailsafe'
+import OptionDownloadLogs from './OptionDownloadLogs'
+import OptionAllowNetwork from './native/OptionAllowNetwork'
+import OptionPassphrase from './OptionPassphrase'
+import OptionExportBookmarks from './OptionExportBookmarks.vue'
+import OptionAutoSync from './OptionAutoSync.vue'
 
 export default {
   name: 'OptionsGoogleDrive',
-  components: { OptionFailsafe, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval, OptionNestedSync },
-  props: ['username', 'password', 'refreshToken', 'localRoot', 'syncInterval', 'strategy', 'bookmark_file', 'nestedSync', 'failsafe'],
+  components: { OptionAutoSync, OptionExportBookmarks, OptionPassphrase, OptionAllowNetwork, OptionDownloadLogs, OptionFailsafe, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval, OptionNestedSync },
+  props: ['username', 'password', 'refreshToken', 'localRoot', 'allowNetwork', 'syncInterval', 'strategy', 'bookmark_file', 'nestedSync', 'failsafe', 'enabled', 'label'],
   data() {
     return {
       panels: [0, 1],
       authorized: false,
-      showPassphrase: true,
+      showPassphrase: false,
     }
   },
   methods: {

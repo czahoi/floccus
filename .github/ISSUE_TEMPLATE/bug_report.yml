@@ -1,0 +1,96 @@
+name: Bug Report
+description: Create a bug report for floccus
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug report! Please fill out this form as completely as possible.
+  - type: markdown
+    attributes:
+      value: If you leave out sections there is a high likelihood it will be moved to the GitHub Discussions.
+  - type: input
+    attributes:
+      label: Which version of floccus are you using?
+      description: 'Please specify the exact version instead of "latest". For example: 4.14.0'
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: How many bookmarks do you have, roughly?
+      description: 'e.g. 10, 300 or 12k'
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Are you using other means to sync bookmarks in parallel to floccus?
+      description: 'e.g. "No" or "Yes, I also sync via Mozilla account"'
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Sync method
+      description: Which sync method are you using?
+      multiple: false
+      options:
+        - Nextcloud Bookmarks
+        - Linkwarden
+        - WebDAV
+        - Google Drive
+        - Git
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Which browser are you using? In case you are using the phone App, specify the Android or iOS version and device please.
+      description: 'Please specify the exact version instead of "latest". For example: Chrome 100.0.4878.0 or '
+  - type: input
+    attributes:
+      label: Which version of Nextcloud Bookmarks are you using? (if relevant)
+      description: 'For example: v10.1.0'
+  - type: input
+    attributes:
+      label: Which version of Nextcloud? (if relevant)
+      description: 'For example: v23.0.1'
+  - type: textarea
+    attributes:
+      label: What kind of WebDAV server are you using? (if relevant)
+      description: Describe the setup of your WebDAV server
+  - type: textarea
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior, please provide a clear number of steps that always reproduces the issue. Screenshots can be provided in the issue body below.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: Before posting the issue go through the steps you've written down to make sure the steps provided are detailed and clear.
+  - type: markdown
+    attributes:
+      value: Contributors should be able to follow the steps provided in order to reproduce the bug.
+  - type: markdown
+    attributes:
+      value: It is often useful to provide a debug log file along with the issue. You can obtain a (redacted) debug log of the most recent sync run in the account settings of your floccus account.
+  - type: markdown
+    attributes:
+      value: You can also let floccus automatically redact your debug logs.
+  - type: checkboxes
+    attributes:
+      label: Debug log provided
+      options:
+        - label: I have provided a debug log file
+          required: false
+  - type: markdown
+    attributes:
+      value: "Please note: To continue development and maintenance of this project in a sustainable way, I ask that you donate to the project when opening a ticket (or at least once your issue is resolved), if you're not a donor already. You can find donation options at <https://floccus.org/donate/>. Thank you!"

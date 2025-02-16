@@ -1,21 +1,9 @@
 import Vue from 'vue'
+import { mutations } from './definitions'
 
-export const mutations = {
-  LOADING_START: 'LOADING_START',
-  LOADING_END: 'LOADING_END',
-  SET_LOCKED: 'SET_LOCKED',
-  SET_SECURED: 'SET_SECURED',
-  LOAD_ACCOUNTS: 'LOAD_ACCOUNTS',
-  STORE_ACCOUNT_DATA: 'STORE_ACCOUNT_DATA',
-  REMOVE_ACCOUNT: 'REMOVE_ACCOUNT',
-  SET_LOGIN_FLOW_STATE: 'SET_LOGIN_FLOW_STATE'
-}
 export const mutationsDefinition = {
   [mutations.SET_LOCKED](state, locked) {
     state.locked = locked
-  },
-  [mutations.SET_SECURED](state, secured) {
-    state.secured = secured
   },
   [mutations.LOAD_ACCOUNTS](state, accounts) {
     state.accounts = accounts

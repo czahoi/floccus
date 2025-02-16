@@ -1,6 +1,7 @@
 const path = require('path')
 const { VueLoaderPlugin } = require('vue-loader')
 const VuetifyLoaderPlugin = require('vuetify-loader/lib/plugin')
+const webpack = require('webpack')
 
 module.exports = {
   entry: {
@@ -12,10 +13,7 @@ module.exports = {
     ),
     options: path.join(__dirname, 'src', 'entries', 'options.js'),
     test: path.join(__dirname, 'src', 'entries', 'test.js'),
-    native: path.join(__dirname, 'src', 'entries', 'native.js')
-  },
-  optimization: {
-    splitChunks: { chunks: 'async' }
+    native: path.join(__dirname, 'src', 'entries', 'native.js'),
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'js'),
@@ -45,7 +43,7 @@ module.exports = {
             options: {
               implementation: require('sass'),
               sassOptions: {
-                fiber: require('fibers'),
+                fiber: false,
                 indentedSyntax: true, // optional
               },
             },
@@ -73,7 +71,7 @@ module.exports = {
                 '@babel/preset-env',
                 {
                   useBuiltIns: 'usage',
-                  corejs: {version: '3.19', proposals: true},
+                  corejs: { version: '3.19', proposals: true },
                   shippedProposals: true,
                 },
               ],
@@ -83,8 +81,22 @@ module.exports = {
       },
     ],
   },
-  plugins: [new VueLoaderPlugin(), new VuetifyLoaderPlugin()],
+  plugins: [
+    new VueLoaderPlugin(),
+    new VuetifyLoaderPlugin(),
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+    }),
+    new webpack.ProvidePlugin({
+      process: 'process/browser.js',
+    }),
+  ],
   resolve: {
-    extensions: ['*', '.js', '.vue', '.ts'],
+    extensions: ['.js', '.vue', '.ts', '.json'],
+    fallback: {
+      buffer: require.resolve('buffer'),
+      process: require.resolve('process/browser.js'),
+      stream: require.resolve('stream-browserify'),
+    },
   },
 }

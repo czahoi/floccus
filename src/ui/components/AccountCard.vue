@@ -55,14 +55,32 @@
             :icon="false"
             :type="statusType"
             class="pa-2 text-caption">
-            {{ statusDetail }} <v-btn
-              v-if="account.data.error"
-              :color="statusType"
-              class="float-right"
-              x-small
-              @click="onGetLogs">
-              {{ t('LabelDebuglogs') }}
-            </v-btn>
+            {{ statusDetail }} <template v-if="account.data.error">
+              <v-btn
+                :color="statusType"
+                class="float-right ml-1"
+                x-small
+                target="_blank"
+                href="https://github.com/floccusaddon/floccus/issues">
+                {{ t('LabelReportproblem') }}
+              </v-btn>
+              <v-btn
+                :color="statusType"
+                class="float-right"
+                x-small
+                @click="onGetLogs">
+                {{ t('LabelDebuglogs') }}
+              </v-btn>
+            </template>
+            <template v-if="status === 'scheduled'">
+              <v-btn
+                :color="statusType"
+                class="float-right"
+                x-small
+                @click="onForceSync">
+                {{ t('LabelScheduledforcesync') }}
+              </v-btn>
+            </template>
           </v-alert>
           <v-alert
             v-if="legacyWarning"
@@ -84,82 +102,52 @@
             no-gutters
             class="mt-2">
             <v-col class="d-flex flex-row">
-              <v-select
-                v-model="account.data.strategy"
-                dense
-                :items="[
-                  {text: strategyLabels['slave'], value: 'slave', icon: strategyIcons['slave']},
-                  {text: strategyLabels['overwrite'], value: 'overwrite', icon: strategyIcons['overwrite']},
-                  {text: strategyLabels['default'], value: 'default', icon: strategyIcons['default']},
-                ]"
-                @change="onChangeStrategy">
-                <template #prepend-inner>
-                  <v-icon>{{ strategyIcons[account.data.strategy] }}</v-icon>
-                </template>
-                <template #item="{item}">
-                  <v-icon>{{ item.icon }}</v-icon> {{ item.text }}
-                </template>
-              </v-select>
+              <v-btn
+                small
+                class="ma-1"
+                :to="{ name: routes.ACCOUNT_OPTIONS, params: { accountId: account.id } }"
+                target="_blank">
+                <v-icon>mdi-cog</v-icon>
+                {{ t('LabelOptions') }}
+              </v-btn>
+            </v-col>
+            <v-col class="d-flex flex-row justify-end">
+              <v-btn
+                class="ma-1 ml-0"
+                small
+                :disabled="account.data.syncing || account.data.scheduled"
+                :title="t('LabelSyncDownOnce')"
+                @click="onTriggerSyncDown">
+                <v-icon>mdi-arrow-down-bold</v-icon>
+              </v-btn>
+              <v-btn
+                class="ma-1"
+                small
+                :disabled="account.data.syncing || account.data.scheduled"
+                :title="t('LabelSyncUpOnce')"
+                @click="onTriggerSyncUp">
+                <v-icon>mdi-arrow-up-bold</v-icon>
+              </v-btn>
               <v-btn
                 v-if="!account.data.syncing"
-                class="primary"
+                :disabled="account.data.scheduled"
+                class="primary ma-1"
                 small
+                :title="t('LabelSyncnow')"
+                :aria-label="t('LabelSyncnow')"
                 @click="onTriggerSync">
                 <v-icon>mdi-sync</v-icon>
-                {{ t('LabelSyncnow') }}
               </v-btn>
               <v-btn
                 v-else
+                class="ma-1 mr-0"
                 small
+                :title="t('LabelCancelsync')"
+                :aria-label="t('LabelCancelsync')"
                 @click="onCancelSync">
                 <v-icon>mdi-cancel</v-icon>
-                {{ t('LabelCancelsync') }}
               </v-btn>
             </v-col>
-          </v-row>
-          <v-row :class="{'d-none': !showDetails, 'pa-2': true, 'mt-3': true, 'justify-space-between': true}">
-            <v-btn
-              small
-              @click="onTriggerSyncUp">
-              <v-icon>mdi-arrow-up-bold</v-icon>
-              {{ t('LabelSyncUpOnce') }}
-            </v-btn>
-            <v-switch
-              v-model="account.data.enabled"
-              :aria-label="t('LabelAutosync')"
-              :label="t('LabelAutosync')"
-              dense
-              class="mt-0 pt-0"
-              @change="onToggleEnabled" />
-          </v-row>
-          <v-row :class="{'d-none': !showDetails, 'pa-2': true, 'mb-3': true, 'justify-space-between': true}">
-            <v-btn
-              small
-              @click="onTriggerSyncDown">
-              <v-icon>mdi-arrow-down-bold</v-icon>
-              {{ t('LabelSyncDownOnce') }}
-            </v-btn>
-
-            <v-btn
-              small
-              :to="{ name: routes.ACCOUNT_OPTIONS, params: { accountId: account.id } }"
-              target="_blank">
-              <v-icon>mdi-settings</v-icon>
-              {{ t('LabelOptions') }}
-            </v-btn>
-          </v-row>
-          <v-row>
-            <v-btn
-              text
-              block
-              @click="showDetails = !showDetails">
-              <v-icon v-if="!showDetails">
-                mdi-chevron-down
-              </v-icon>
-              <v-icon v-else>
-                mdi-chevron-up
-              </v-icon>
-            </v-btn>
           </v-row>
         </v-col>
       </v-row>
@@ -170,7 +158,7 @@
 <script>
 import PathHelper from '../../lib/PathHelper'
 import humanizeDuration from 'humanize-duration'
-import { actions } from '../store'
+import { actions } from '../store/definitions'
 import { routes } from '../router'
 import BrowserTree from '../../lib/browser/BrowserTree'
 
@@ -189,29 +177,37 @@ export default {
         disabled: 'rgb(125, 114, 128)',
         ok: '#3d8e39',
         error: '#8e3939',
-        syncing: '#2196F3'
+        syncing: '#2196F3',
+        scheduled: '#2196F3',
       },
       statusIcons: {
         disabled: 'mdi-sync-off',
         ok: 'mdi-check',
         error: 'mdi-sync-alert',
-        syncing: 'mdi-sync'
+        syncing: 'mdi-sync',
+        scheduled: 'mdi-timer-sync-outline'
       },
       statusLabels: {
         disabled: this.t('StatusDisabled'),
         ok: this.t('StatusAllgood'),
         error: this.t('StatusError'),
-        syncing: this.t('StatusSyncing')
+        syncing: this.t('StatusSyncing'),
+        scheduled: this.t('StatusScheduled')
       },
       strategyIcons: {
         slave: 'mdi-arrow-down-bold',
         overwrite: 'mdi-arrow-up-bold',
-        default: 'mdi-sync',
+        default: 'mdi-merge',
       },
       strategyLabels: {
         slave: this.t('LabelSyncDown'),
         overwrite: this.t('LabelSyncUp'),
         default: this.t('LabelSyncNormal'),
+      },
+      strategyDescriptions: {
+        slave: this.t('DescriptionSyncDown'),
+        overwrite: this.t('DescriptionSyncUp'),
+        default: this.t('DescriptionSyncNormal'),
       },
       showDetails: false
     }
@@ -232,6 +228,9 @@ export default {
     status() {
       if (this.account.data.syncing) {
         return 'syncing'
+      }
+      if (this.account.data.scheduled) {
+        return 'scheduled'
       }
       if (this.account.data.error) {
         return 'error'
@@ -258,10 +257,21 @@ export default {
     },
     statusDetail() {
       if (this.account.data.error) {
-        return this.account.data.error
+        return this.account.data.error + ' | ' + this.t(
+          'StatusLastsynced',
+          [humanizeDuration(Date.now() - this.account.data.lastSync, {
+            largest: 1,
+            round: true,
+            language: navigator.language.split('-')[0],
+            fallbacks: navigator.languages.map(lang => lang.split('-')[0]).concat(['en'])
+          })]
+        )
       }
       if (this.account.data.syncing) {
-        return 'Synchronization in progress.'
+        return this.t('DescriptionSyncinprogress')
+      }
+      if (this.account.data.scheduled) {
+        return this.t('DescriptionSyncscheduled')
       }
       if (this.account.data.lastSync) {
         return this.t(
@@ -316,6 +326,11 @@ export default {
     },
     onGetLogs() {
       this.$store.dispatch(actions.DOWNLOAD_LOGS)
+    },
+    onForceSync() {
+      if (confirm(this.t('DescriptionScheduledforcesync'))) {
+        this.$store.dispatch(actions.FORCE_SYNC, this.account.id)
+      }
     }
   }
 }

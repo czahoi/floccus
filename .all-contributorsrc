@@ -119,8 +119,134 @@
         "question",
         "bug"
       ]
+    },
+    {
+      "login": "marcelklehr",
+      "name": "Marcel Klehr",
+      "avatar_url": "https://avatars.githubusercontent.com/u/986878?v=4",
+      "profile": "https://github.com/marcelklehr",
+      "contributions": [
+        "question",
+        "code",
+        "content",
+        "design",
+        "doc",
+        "infra",
+        "maintenance",
+        "projectManagement"
+      ]
+    },
+    {
+      "login": "binsee",
+      "name": "binsee",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5285894?v=4",
+      "profile": "https://github.com/binsee",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "mlshapiro",
+      "name": "Marc Shapiro",
+      "avatar_url": "https://avatars.githubusercontent.com/u/8190979?v=4",
+      "profile": "https://daitem.io/",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "marlluslustosa",
+      "name": "Marllus Lustosa",
+      "avatar_url": "https://avatars.githubusercontent.com/u/29416568?v=4",
+      "profile": "https://marllus.com/",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "IzzySoft",
+      "name": "Izzy",
+      "avatar_url": "https://avatars.githubusercontent.com/u/6781438?v=4",
+      "profile": "https://android.izzysoft.de/",
+      "contributions": [
+        "bug",
+        "ideas",
+        "infra"
+      ]
+    },
+    {
+      "login": "sunjam",
+      "name": "sunjam",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1787238?v=4",
+      "profile": "https://github.com/sunjam",
+      "contributions": [
+        "ideas",
+        "test"
+      ]
+    },
+    {
+      "login": "dsiminiuk",
+      "name": "Danny Siminiuk",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5713547?v=4",
+      "profile": "https://github.com/dsiminiuk",
+      "contributions": [
+        "test",
+        "ideas"
+      ]
+    },
+    {
+      "login": "Seirade",
+      "name": "Seirade",
+      "avatar_url": "https://avatars.githubusercontent.com/u/45798662?v=4",
+      "profile": "https://github.com/Seirade",
+      "contributions": [
+        "ideas",
+        "bug"
+      ]
+    },
+    {
+      "login": "pinpontitit",
+      "name": "pinpontitit",
+      "avatar_url": "https://avatars.githubusercontent.com/u/100489443?v=4",
+      "profile": "https://github.com/pinpontitit",
+      "contributions": [
+        "ideas",
+        "bug",
+        "code"
+      ]
+    },
+    {
+      "login": "dmotte",
+      "name": "Motte",
+      "avatar_url": "https://avatars.githubusercontent.com/u/37443982?v=4",
+      "profile": "https://dmotte.github.io/",
+      "contributions": [
+        "code",
+        "bug"
+      ]
+    },
+    {
+      "login": "macrogreg",
+      "name": "macrogreg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/20691812?v=4",
+      "profile": "https://github.com/macrogreg",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "andybalaam",
+      "name": "Andy Balaam",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76812?v=4",
+      "profile": "http://www.artificialworlds.net",
+      "contributions": [
+        "code",
+        "bug"
+      ]
     }
   ],
   "skipCi": true,
-  "contributorsPerLine": 7
+  "contributorsPerLine": 7,
+  "commitConvention": "none",
+  "commitType": "docs"
 }
